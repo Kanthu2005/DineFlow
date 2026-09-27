@@ -1,0 +1,217 @@
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse, JSONResponse
+
+from app.config.settings import settings
+from app.database.mongodb import client, db, users_collection
+from app.database.indexes import create_indexes
+from app.services.auth_service import hash_password
+from app.services.common import now_utc
+from app.routes.routes import router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    # Startup
+    try:
+        client.admin.command("ping")
+
+        print("========================================")
+        print("MongoDB connection successful")
+        print(f"Database: {settings.DATABASE_NAME}")
+        print("========================================")
+
+        create_indexes(db)
+
+        print("MongoDB indexes created successfully")
+
+        # Auto-seed default roles if not already present
+        default_roles = [
+            ("admin@dineflow.com", "System Administrator", "ADMIN"),
+            ("manager@dineflow.com", "General Manager", "MANAGER"),
+            ("chef@dineflow.com", "Head Chef", "CHEF"),
+            ("waiter@dineflow.com", "Floor Waiter", "WAITER"),
+            ("cashier@dineflow.com", "Billing Cashier", "CASHIER"),
+        ]
+        for email, name, role in default_roles:
+            if not users_collection.find_one({"email": email.lower()}):
+                users_collection.insert_one({
+                    "name": name,
+                    "email": email.lower(),
+                    "password": hash_password("Password123!"),
+                    "role": role,
+                    "is_active": True,
+                    "created_at": now_utc(),
+                    "updated_at": now_utc(),
+                })
+        print("Default staff role accounts verified")
+
+        try:
+            from seed_indian_menu import seed_indian_menu
+            seed_indian_menu()
+            print("Indian cuisine menu catalog verified")
+        except Exception as se:
+            print(f"Menu seed warning: {se}")
+
+    except Exception as e:
+        print("========================================")
+        print("MongoDB connection failed")
+        print(f"Error: {e}")
+        print("========================================")
+
+    yield
+
+    # Shutdown
+    try:
+        client.close()
+        print("MongoDB connection closed")
+
+    except Exception as e:
+        print(f"Error closing MongoDB connection: {e}")
+
+
+tags_metadata = [
+    {
+        "name": "Authentication",
+        "description": "User login, registration, and profile (`/api/auth/*`). Use the **Authorize 🔓** button with your JWT token.",
+    },
+    {
+        "name": "Menu",
+        "description": "Food & beverage catalog management, category filtering, search, and availability toggling.",
+    },
+    {
+        "name": "Recipes",
+        "description": "Recipe mappings linking menu items to required ingredient quantities with unit normalization.",
+    },
+    {
+        "name": "Ingredients",
+        "description": "Warehouse raw materials, stock adjustments, low-stock alerts, and serving capacity estimation.",
+    },
+    {
+        "name": "Tables",
+        "description": "Dining tables, occupancy status, and seating assignments.",
+    },
+    {
+        "name": "Reservations",
+        "description": "Table reservations with guest capacity validation and overlap collision detection.",
+    },
+    {
+        "name": "Orders",
+        "description": "Customer order lifecycle, item price snapshots, subtotal/tax calculations, confirmation, and cancellations.",
+    },
+    {
+        "name": "Kitchen",
+        "description": "Kitchen tickets, priority queueing, preparation time estimation, and staff workload management.",
+    },
+    {
+        "name": "Billing & Payments",
+        "description": "Invoice generation, Decimal precision tax/discount calculations, duplicate-protected payments, and table release.",
+    },
+    {
+        "name": "Activity Logs",
+        "description": "MongoDB event-sourcing and audit trail for order actions.",
+    },
+    {
+        "name": "Kitchen Events",
+        "description": "MongoDB kitchen status transitions and workload events.",
+    },
+    {
+        "name": "Feedback",
+        "description": "Customer ratings (1-5) and reviews for completed dining orders.",
+    },
+    {
+        "name": "Reports & Analytics",
+        "description": "Daily sales performance, kitchen workload analytics, and dish serving capacity reports.",
+    },
+    {
+        "name": "Users",
+        "description": "User accounts and role-based permissions management.",
+    },
+    {
+        "name": "Customers",
+        "description": "Customer directory, contact numbers, and order history.",
+    },
+]
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version="1.0.0",
+    openapi_tags=tags_metadata,
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "docExpansion": "list",
+        "defaultModelsExpandDepth": 1,
+    },
+    lifespan=lifespan,
+)
+
+# Enable CORS for frontend UI connecting from any origin/port
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include router under /api for clean canonical Swagger documentation
+app.include_router(
+    router,
+    prefix="/api",
+)
+# Include root router silently for backward compatibility
+app.include_router(
+    router,
+    include_in_schema=False,
+)
+
+# Mount frontend directory for seamless standalone or integrated UI access
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend_app")
+
+
+@app.get("/", include_in_schema=False)
+def home():
+    if os.path.exists(FRONTEND_DIR):
+        return RedirectResponse(url="/app/login.html")
+
+    return {
+        "message": "Restaurant Management System API is running",
+        "database": "MongoDB",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/login", include_in_schema=False)
+@app.get("/app/login", include_in_schema=False)
+def login_page():
+    return RedirectResponse(url="/app/login.html")
+
+
+
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+
+    try:
+        client.admin.command("ping")
+
+        return {
+            "status": "healthy",
+            "database": "MongoDB",
+            "database_name": settings.DATABASE_NAME,
+        }
+
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "MongoDB",
+            "error": str(e),
+        }
+
