@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
 
         if not is_vercel or not has_menu:
             try:
-                from seed_indian_menu import seed_indian_menu
+                from app.database.seed_indian_menu import seed_indian_menu
                 seed_indian_menu()
                 print("Indian cuisine menu catalog verified")
             except Exception as se:
@@ -177,19 +177,22 @@ app.include_router(
 
 # Mount frontend directory for seamless standalone or integrated UI access
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend_app")
+FRONTEND_DIST = os.path.join(FRONTEND_DIR, "dist")
+STATIC_DIR = FRONTEND_DIST if os.path.exists(FRONTEND_DIST) else FRONTEND_DIR
+
+if os.path.exists(STATIC_DIR):
+    app.mount("/app", StaticFiles(directory=STATIC_DIR, html=True), name="frontend_app")
 
 
 @app.get("/", include_in_schema=False)
 def home():
-    if os.path.exists(FRONTEND_DIR):
+    if os.path.exists(STATIC_DIR):
         return RedirectResponse(url="/app/index.html")
 
     return {
         "message": "Restaurant Management System API is running",
         "database": "MongoDB",
-        "version": "1.0.0",
+        "version": "2.0.0",
     }
 
 

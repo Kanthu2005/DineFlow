@@ -7,8 +7,7 @@
       "config": {
         "includeFiles": [
           "app/**",
-          "frontend/**",
-          "seed_indian_menu.py"
+          "frontend/**"
         ]
       }
     }
