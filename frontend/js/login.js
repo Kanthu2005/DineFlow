@@ -14,6 +14,12 @@ const LoginController = (() => {
   };
 
   async function init() {
+    // If opened directly without ?force=true, redirect immediately to dashboard
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("force")) {
+      window.location.href = "index.html";
+      return;
+    }
     checkExistingAuth();
     checkHealth();
     setupEvents();
@@ -168,13 +174,19 @@ const LoginController = (() => {
     alertBox.style.display = "flex";
   }
 
-  async function quickRoleLogin(role) {
+  async function quickRoleLogin(role, cardElement = null) {
     const account = PRESET_ACCOUNTS[role];
     if (!account) return;
 
     if (window.Sound) Sound.click();
     showAlert(`Authenticating as ${account.title}...`, "warning");
-    setSubmitLoading("login-submit-btn", true, "Signing in...");
+
+    const btn = cardElement ? cardElement.querySelector(".role-card-btn") : null;
+    const originalBtnText = btn ? btn.innerHTML : "Login";
+    if (btn) {
+      btn.innerHTML = `<span style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; margin-right:4px; vertical-align:middle;"></span> Loading...`;
+      btn.disabled = true;
+    }
 
     try {
       const res = await API.auth.login(account.email, account.password);
@@ -185,12 +197,15 @@ const LoginController = (() => {
         showAlert(`Welcome back, ${res.user.name || account.title}! Launching workspace...`, "success");
         setTimeout(() => {
           window.location.href = "index.html";
-        }, 350);
+        }, 300);
       } else {
         throw new Error("Invalid response received from authentication server.");
       }
     } catch (err) {
-      setSubmitLoading("login-submit-btn", false, "Sign In to Workspace &rarr;");
+      if (btn) {
+        btn.innerHTML = originalBtnText;
+        btn.disabled = false;
+      }
       if (window.Sound) Sound.error();
       showAlert(`Quick Login failed: ${err.message || "Please ensure the backend is active."}`, "danger");
     }

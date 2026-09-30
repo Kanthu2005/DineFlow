@@ -15,19 +15,49 @@ const App = (() => {
     { role: "CASHIER", email: "cashier@dineflow.com", name: "Billing Cashier" },
   ];
 
+  // Auto-authenticate default session so Dashboard is the first page directly
+  async function ensureAuthenticated() {
+    let user = API.getCurrentUser();
+    let token = API.getToken();
+
+    if (token && user) {
+      return;
+    }
+
+    // Default to System Admin as primary station account
+    const defaultAccount = PRESET_ACCOUNTS[0]; // Admin
+    const defaultUser = {
+      name: defaultAccount.name,
+      email: defaultAccount.email,
+      role: defaultAccount.role,
+    };
+    API.setCurrentUser(defaultUser);
+
+    // Silently obtain valid JWT from backend if online
+    try {
+      const res = await API.auth.login(defaultAccount.email, "Password123!");
+      if (res && res.access_token) {
+        API.setToken(res.access_token);
+        if (res.user) {
+          API.setCurrentUser(res.user);
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn("Silent admin login failed, fallback token active:", e);
+    }
+
+    // Fallback token for offline / local mode
+    API.setToken("demo-admin-session-token");
+  }
+
   async function start() {
     initTheme();
     setupEventListeners();
     await checkBackendConnection();
 
-    // Check if user is logged in
-    const user = API.getCurrentUser();
-    const token = API.getToken();
-
-    if (!token || !user) {
-      window.location.href = "login.html";
-      return;
-    }
+    // Ensure session exists so the main dashboard is loaded directly as the first page
+    await ensureAuthenticated();
 
     updateUserUI();
 
@@ -83,16 +113,20 @@ const App = (() => {
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") closeAllModals();
 
-      // Quick focus search on '/'
-      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) {
+      // Quick focus search on '/' or Ctrl+K / Cmd+K
+      if ((e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) {
         e.preventDefault();
-        if (currentView !== "pos") {
-          switchView("pos");
-        }
-        const searchInput = document.getElementById("pos-search-input");
-        if (searchInput) {
-          searchInput.focus();
-          searchInput.select();
+        const globalSearch = document.getElementById("global-header-search");
+        if (globalSearch) {
+          globalSearch.focus();
+          globalSearch.select();
+        } else {
+          if (currentView !== "pos") switchView("pos");
+          const searchInput = document.getElementById("pos-search-input");
+          if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+          }
         }
       }
     });
@@ -227,13 +261,16 @@ const App = (() => {
     applyRolePermissions(user.role);
   }
 
-  function logout() {
+  async function logout() {
     API.setToken(null);
     API.setCurrentUser(null);
-    showToast("Signed out successfully. Returning to login...", "info");
-    setTimeout(() => {
-      window.location.href = "login.html";
-    }, 350);
+    showToast("Session reset. Restoring System Administrator...", "info");
+    await ensureAuthenticated();
+    updateUserUI();
+    applyRolePermissions("ADMIN");
+    await refreshAll();
+    switchView("dashboard");
+    showToast("Active station reset to System Admin", "success");
   }
 
   function applyRolePermissions(role) {
@@ -372,6 +409,22 @@ const App = (() => {
     document.querySelectorAll(".modal-overlay").forEach(m => m.classList.remove("show"));
   }
 
+  // Dismiss modal when clicking backdrop or pressing Escape
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains("modal-overlay")) {
+      e.target.classList.remove("show");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const openModals = Array.from(document.querySelectorAll(".modal-overlay.show"));
+      if (openModals.length > 0) {
+        openModals[openModals.length - 1].classList.remove("show");
+      }
+    }
+  });
+
   // Loader
   function showLoader(show) {
     const loader = document.getElementById("global-loader");
@@ -410,6 +463,24 @@ const App = (() => {
     return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
+  function onGlobalSearch(query) {
+    const val = (query || "").trim();
+    if (currentView === "pos") {
+      const posInput = document.getElementById("pos-search-input");
+      if (posInput && posInput.value !== val) posInput.value = val;
+      if (window.POS && typeof POS.search === "function") POS.search(val);
+    } else if (currentView === "menu-mgmt") {
+      const menuInput = document.getElementById("menu-mgmt-search-input");
+      if (menuInput && menuInput.value !== val) menuInput.value = val;
+      if (window.MenuMgmt && typeof MenuMgmt.searchDishes === "function") MenuMgmt.searchDishes(val);
+    } else {
+      switchView("pos");
+      const posInput = document.getElementById("pos-search-input");
+      if (posInput) posInput.value = val;
+      if (window.POS && typeof POS.search === "function") POS.search(val);
+    }
+  }
+
   return {
     start,
     switchView,
@@ -425,7 +496,8 @@ const App = (() => {
     showLoader,
     showToast,
     logout,
-    refreshAll
+    refreshAll,
+    onGlobalSearch
   };
 })();
 

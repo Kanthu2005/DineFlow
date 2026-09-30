@@ -1840,11 +1840,31 @@ html.light-theme .menu-card-delete-btn {
   justify-content: center;
   z-index: 1000;
   padding: 1.5rem;
-  animation: fadeIn 0.2s ease-out;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .modal-overlay.show {
   display: flex;
+  opacity: 1;
+}
+
+/* Secondary & Nested Confirmation Modals */
+#add-category-modal,
+#delete-dish-modal,
+#delete-category-modal,
+#table-status-modal,
+#discount-modal,
+#api-config-modal {
+  z-index: 1100;
+}
+
+#add-category-modal.show,
+#delete-dish-modal.show,
+#delete-category-modal.show {
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .modal-dialog {
@@ -1856,13 +1876,13 @@ html.light-theme .menu-card-delete-btn {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 0 20px 40px rgba(0, 0, 0, 0.6);
   overflow: hidden;
-  animation: modalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modalSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modalSlide {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 

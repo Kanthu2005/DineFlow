@@ -179,7 +179,7 @@ if os.path.exists(FRONTEND_DIR):
 @app.get("/", include_in_schema=False)
 def home():
     if os.path.exists(FRONTEND_DIR):
-        return RedirectResponse(url="/app/login.html")
+        return RedirectResponse(url="/app/index.html")
 
     return {
         "message": "Restaurant Management System API is running",
@@ -191,7 +191,7 @@ def home():
 @app.get("/login", include_in_schema=False)
 @app.get("/app/login", include_in_schema=False)
 def login_page():
-    return RedirectResponse(url="/app/login.html")
+    return RedirectResponse(url="/app/index.html")
 
 
 

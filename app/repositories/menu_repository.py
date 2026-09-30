@@ -19,8 +19,23 @@ class MenuRepository(BaseRepository):
         return serialize_document(doc) if doc else None
 
     def find_by_category(self, category_id: str) -> List[Dict[str, Any]]:
-        oid = to_object_id(category_id)
-        docs = self.collection.find({"category_id": oid})
+        if not category_id:
+            return []
+        match_keys = []
+        if isinstance(category_id, ObjectId):
+            match_keys.extend([category_id, str(category_id)])
+        elif ObjectId.is_valid(str(category_id)):
+            match_keys.extend([ObjectId(str(category_id)), str(category_id)])
+        else:
+            match_keys.append(str(category_id))
+            cat = self.find_category_by_name(str(category_id))
+            if cat:
+                raw_id = cat.get("id") or cat.get("_id")
+                if raw_id:
+                    match_keys.append(raw_id)
+                    if ObjectId.is_valid(str(raw_id)):
+                        match_keys.append(ObjectId(str(raw_id)))
+        docs = self.collection.find({"category_id": {"$in": match_keys}})
         return serialize_documents(docs)
 
     def find_available(self) -> List[Dict[str, Any]]:
@@ -80,10 +95,15 @@ class MenuRepository(BaseRepository):
         return self.find_category_by_id(raw_id)
 
     def delete_category(self, category_id: str) -> bool:
-        cat = self.find_category_by_id(category_id)
-        if not cat:
+        if not category_id:
             return False
-        raw_id = cat.get("id") or cat.get("_id")
-        oid = ObjectId(str(raw_id)) if ObjectId.is_valid(str(raw_id)) else raw_id
-        res = self.categories_col.delete_one({"_id": oid})
+        cat = self.find_category_by_id(category_id)
+        raw_id = (cat.get("id") or cat.get("_id")) if cat else category_id
+        if not raw_id:
+            return False
+        raw_str = str(raw_id).strip()
+        queries = [{"_id": raw_str}]
+        if ObjectId.is_valid(raw_str):
+            queries.insert(0, {"_id": ObjectId(raw_str)})
+        res = self.categories_col.delete_one({"$or": queries})
         return res.deleted_count > 0

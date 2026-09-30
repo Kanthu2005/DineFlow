@@ -13,8 +13,16 @@ class BaseRepository:
         self.collection = collection
 
     def find_by_id(self, item_id: str | ObjectId) -> Optional[Dict[str, Any]]:
-        oid = to_object_id(item_id)
-        doc = self.collection.find_one({"_id": oid})
+        if not item_id:
+            return None
+        if isinstance(item_id, ObjectId):
+            doc = self.collection.find_one({"_id": item_id})
+        elif ObjectId.is_valid(str(item_id)):
+            doc = self.collection.find_one({
+                "$or": [{"_id": ObjectId(str(item_id))}, {"_id": str(item_id)}]
+            })
+        else:
+            doc = self.collection.find_one({"_id": str(item_id)})
         return serialize_document(doc) if doc else None
 
     def find_one(self, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -36,15 +44,32 @@ class BaseRepository:
         return serialize_document(document)
 
     def update(self, item_id: str | ObjectId, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        oid = to_object_id(item_id)
+        if not item_id:
+            return None
         if "updated_at" not in update_data:
             update_data["updated_at"] = now_utc()
-        self.collection.update_one({"_id": oid}, {"$set": update_data})
-        return self.find_by_id(oid)
+
+        if isinstance(item_id, ObjectId):
+            query = {"_id": item_id}
+        elif ObjectId.is_valid(str(item_id)):
+            query = {"$or": [{"_id": ObjectId(str(item_id))}, {"_id": str(item_id)}]}
+        else:
+            query = {"_id": str(item_id)}
+
+        self.collection.update_one(query, {"$set": update_data})
+        return self.find_by_id(item_id)
 
     def delete(self, item_id: str | ObjectId) -> bool:
-        oid = to_object_id(item_id)
-        result = self.collection.delete_one({"_id": oid})
+        if not item_id:
+            return False
+        if isinstance(item_id, ObjectId):
+            query = {"_id": item_id}
+        elif ObjectId.is_valid(str(item_id)):
+            query = {"$or": [{"_id": ObjectId(str(item_id))}, {"_id": str(item_id)}]}
+        else:
+            query = {"_id": str(item_id)}
+
+        result = self.collection.delete_one(query)
         return result.deleted_count > 0
 
     def count(self, query: Optional[Dict[str, Any]] = None) -> int:

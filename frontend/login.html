@@ -35,6 +35,11 @@
           <p class="login-subtitle">Restaurant Operations, Kitchen KDS & Menu Suite</p>
         </div>
       </div>
+      <div style="margin-top: 0.75rem; text-align: center;">
+        <a href="index.html" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; text-decoration: none; padding: 0.35rem 0.85rem; border-color: rgba(245, 158, 11, 0.4); color: var(--accent-primary);">
+          <span>&larr; Go directly to Operations Dashboard</span>
+        </a>
+      </div>
     </header>
 
     <!-- EXISTING SESSION BANNER (Hidden unless authenticated) -->
@@ -59,10 +64,13 @@
           <span style="font-size: 0.72rem; color: var(--text-dim);">1-Click Instant Login</span>
         </div>
 
+        <!-- Alert Notice Box -->
+        <div id="login-alert" class="login-alert" style="display: none; margin-bottom: 0.75rem;"></div>
+
         <div class="role-cards-list">
 
           <!-- ADMIN -->
-          <div class="role-card-item" onclick="LoginController.quickRoleLogin('ADMIN')" title="Sign in as System Administrator">
+          <div class="role-card-item" onclick="LoginController.quickRoleLogin('ADMIN', this)" title="Sign in as System Administrator">
             <div class="role-card-left">
               <div class="role-avatar-badge" style="background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.4); color: #c084fc;">
                 👑
@@ -79,7 +87,7 @@
           </div>
 
           <!-- MANAGER -->
-          <div class="role-card-item" onclick="LoginController.quickRoleLogin('MANAGER')" title="Sign in as General Manager">
+          <div class="role-card-item" onclick="LoginController.quickRoleLogin('MANAGER', this)" title="Sign in as General Manager">
             <div class="role-card-left">
               <div class="role-avatar-badge" style="background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); color: #60a5fa;">
                 📊
@@ -96,7 +104,7 @@
           </div>
 
           <!-- CHEF -->
-          <div class="role-card-item" onclick="LoginController.quickRoleLogin('CHEF')" title="Sign in as Head Chef">
+          <div class="role-card-item" onclick="LoginController.quickRoleLogin('CHEF', this)" title="Sign in as Head Chef">
             <div class="role-card-left">
               <div class="role-avatar-badge" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
                 👨‍🍳
@@ -113,7 +121,7 @@
           </div>
 
           <!-- WAITER -->
-          <div class="role-card-item" onclick="LoginController.quickRoleLogin('WAITER')" title="Sign in as Floor Waiter">
+          <div class="role-card-item" onclick="LoginController.quickRoleLogin('WAITER', this)" title="Sign in as Floor Waiter">
             <div class="role-card-left">
               <div class="role-avatar-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
                 🤵
@@ -130,7 +138,7 @@
           </div>
 
           <!-- CASHIER -->
-          <div class="role-card-item" onclick="LoginController.quickRoleLogin('CASHIER')" title="Sign in as Billing Cashier">
+          <div class="role-card-item" onclick="LoginController.quickRoleLogin('CASHIER', this)" title="Sign in as Billing Cashier">
             <div class="role-card-left">
               <div class="role-avatar-badge" style="background: rgba(234, 88, 12, 0.15); border-color: rgba(234, 88, 12, 0.4); color: #fb923c;">
                 💳

@@ -36,9 +36,12 @@ class OrderItemResponse(BaseModel):
 
 class OrderCreate(BaseModel):
     customer_id: str | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
     table_id: str | None = None
-    order_type: str
-    created_by: str
+    order_type: str = "DINE_IN"
+    created_by: str | None = None
+    items: list[OrderItemCreate] | None = None
 
 
 class OrderResponse(BaseModel):

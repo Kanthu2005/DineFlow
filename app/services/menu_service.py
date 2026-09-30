@@ -64,8 +64,21 @@ class MenuCategoryService:
         cat = menu_repo.find_category_by_id(category_id)
         if not cat:
             raise ValueError("Category not found")
-        raw_id = cat.get("id") or cat.get("_id")
-        menu_repo.delete_category(raw_id)
+        raw_id = cat.get("id") or cat.get("_id") or category_id
+        oid = ObjectId(str(raw_id)) if ObjectId.is_valid(str(raw_id)) else raw_id
+
+        # Reassign existing items belonging to this category to a remaining category so they are never lost
+        fallback_cat = menu_repo.categories_col.find_one({"_id": {"$nin": [oid, str(raw_id)]}})
+        if fallback_cat:
+            fallback_id = fallback_cat["_id"]
+            menu_repo.collection.update_many(
+                {"category_id": {"$in": [oid, str(raw_id), str(oid)]}},
+                {"$set": {"category_id": fallback_id}}
+            )
+
+        deleted = menu_repo.delete_category(raw_id)
+        if not deleted:
+            raise ValueError(f"Could not delete category '{cat['name']}'")
         return {"message": f"Category '{cat['name']}' deleted successfully"}
 
 
@@ -161,8 +174,11 @@ class MenuItemService:
         if "category_id" in update_data and update_data["category_id"]:
             cat = menu_repo.find_category_by_id(update_data["category_id"])
             if not cat:
+                cat = menu_repo.find_category_by_name(str(update_data["category_id"]))
+            if not cat:
                 raise ValueError("Category not found")
-            update_data["category_id"] = to_object_id(update_data["category_id"])
+            target_cat_id = cat.get("id") or cat.get("_id")
+            update_data["category_id"] = ObjectId(str(target_cat_id)) if ObjectId.is_valid(str(target_cat_id)) else str(target_cat_id)
 
         updated = menu_repo.update(item_id, update_data)
         if not updated:
@@ -178,8 +194,25 @@ class MenuItemService:
 
     @staticmethod
     def delete_item(item_id: str) -> Dict[str, Any]:
-        existing = menu_repo.find_by_id(item_id)
+        item_id_clean = str(item_id).strip()
+        existing = menu_repo.find_by_id(item_id_clean)
+        if not existing:
+            existing = menu_repo.find_by_name(item_id_clean)
         if not existing:
             raise ValueError("Menu item not found")
-        menu_repo.delete(item_id)
+        raw_id = existing.get("id") or existing.get("_id") or item_id_clean
+        deleted = menu_repo.delete(raw_id)
+        if not deleted and ObjectId.is_valid(str(raw_id)):
+            deleted = menu_repo.collection.delete_one({"_id": ObjectId(str(raw_id))}).deleted_count > 0
+        if not deleted:
+            deleted = menu_repo.collection.delete_one({"_id": str(raw_id)}).deleted_count > 0
+
+        # Clean up associated recipes
+        from app.database.mongodb import recipes_collection
+        try:
+            oid = ObjectId(str(raw_id)) if ObjectId.is_valid(str(raw_id)) else raw_id
+            recipes_collection.delete_many({"menu_item_id": {"$in": [oid, str(raw_id)]}})
+        except Exception:
+            pass
+
         return {"message": f"Menu item '{existing['name']}' deleted successfully"}

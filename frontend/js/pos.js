@@ -11,6 +11,29 @@ const POS = (() => {
   let discountPercent = 0;
   let searchQuery = "";
 
+  const CANONICAL_CATEGORIES = [
+    "Veg Starters",
+    "Non-Veg Starters",
+    "Veg Main Course",
+    "Non-Veg Main Course",
+    "Biryani",
+    "Rice & Noodles",
+    "Breads",
+    "Desserts",
+    "Beverages"
+  ];
+
+  function sortCategories(catList) {
+    return [...catList].sort((a, b) => {
+      const idxA = CANONICAL_CATEGORIES.indexOf(a.name);
+      const idxB = CANONICAL_CATEGORIES.indexOf(b.name);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }
+
   async function init() {
     await loadCategories();
     await loadMenuItems();
@@ -23,7 +46,8 @@ const POS = (() => {
 
   async function loadCategories() {
     try {
-      categories = await API.menu.getCategories();
+      const fetched = await API.menu.getCategories();
+      categories = Array.isArray(fetched) ? sortCategories(fetched) : [];
     } catch (e) {
       console.warn("Could not load categories:", e);
       categories = [];
@@ -68,12 +92,16 @@ const POS = (() => {
 
   function getCategoryIcon(name) {
     const n = (name || "").toLowerCase();
-    if (n.includes("curry") || n.includes("main") || n.includes("entree")) return "🍛";
+    if (n.includes("non-veg starter") || n.includes("non veg starter")) return "🍗";
+    if (n.includes("veg starter")) return "🥗";
     if (n.includes("starter") || n.includes("appetizer") || n.includes("snack")) return "🥗";
-    if (n.includes("bread") || n.includes("roti") || n.includes("naan")) return "🫓";
-    if (n.includes("rice") || n.includes("biryani")) return "🍚";
-    if (n.includes("drink") || n.includes("beverage")) return "🥤";
-    if (n.includes("dessert") || n.includes("sweet")) return "🍰";
+    if (n.includes("non-veg main") || n.includes("non veg main")) return "🍖";
+    if (n.includes("veg main") || n.includes("main course") || n.includes("curry") || n.includes("entree")) return "🍛";
+    if (n.includes("biryani")) return "🍚";
+    if (n.includes("rice") || n.includes("noodle")) return "🍜";
+    if (n.includes("bread") || n.includes("roti") || n.includes("naan") || n.includes("kulcha")) return "🫓";
+    if (n.includes("dessert") || n.includes("sweet") || n.includes("ice cream") || n.includes("jamun")) return "🍨";
+    if (n.includes("beverage") || n.includes("drink") || n.includes("lassi") || n.includes("chai") || n.includes("shake")) return "🥤";
     if (n.includes("pizza") || n.includes("burger")) return "🍔";
     return "🍽️";
   }
@@ -86,7 +114,12 @@ const POS = (() => {
     
     categories.forEach(cat => {
       const catId = cat.id || cat._id;
-      const count = menuItems.filter(i => (i.category_id === catId || (i.category_id && i.category_id.$oid === catId))).length;
+      const count = menuItems.filter(i => {
+        const raw = typeof i.category_id === "object"
+          ? (i.category_id?.$oid || i.category_id?.id || i.category_id?._id || String(i.category_id))
+          : String(i.category_id || "");
+        return raw === catId || raw === cat.name;
+      }).length;
       const icon = getCategoryIcon(cat.name);
       html += `<button class="category-tab-btn ${activeCategoryId === catId ? 'active' : ''}" onclick="POS.filterCategory('${catId}')">${icon} ${cat.name} (${count})</button>`;
     });
@@ -117,8 +150,20 @@ const POS = (() => {
   }
 
   function search(query) {
-    searchQuery = query.toLowerCase().trim();
+    searchQuery = (query || "").toLowerCase().trim();
+    // When actively typing a search term, auto-broaden to all categories so user finds matches instantly!
+    if (searchQuery && activeCategoryId !== "all") {
+      activeCategoryId = "all";
+      renderCategories();
+    }
     renderMenuItems();
+  }
+
+  function removeDishFromDisplay(itemId) {
+    menuItems = menuItems.filter(i => (i.id || i._id) !== itemId);
+    removeItem(itemId);
+    renderMenuItems();
+    renderCategories();
   }
 
   function renderMenuItems() {
@@ -127,11 +172,14 @@ const POS = (() => {
 
     let filtered = menuItems;
 
-    // Category filter
+    // Category filter (applied if not 'all')
     if (activeCategoryId !== "all") {
+      const activeCat = categories.find(c => (c.id === activeCategoryId || c._id === activeCategoryId));
       filtered = filtered.filter(item => {
-        const cId = item.category_id?.id || item.category_id?._id || item.category_id;
-        return cId === activeCategoryId;
+        const raw = typeof item.category_id === "object"
+          ? (item.category_id?.$oid || item.category_id?.id || item.category_id?._id || String(item.category_id))
+          : String(item.category_id || "");
+        return raw === activeCategoryId || (activeCat && raw === activeCat.name);
       });
     }
 
@@ -144,12 +192,23 @@ const POS = (() => {
       filtered = filtered.filter(item => (item.preparation_time || 0) <= 15);
     }
 
-    // Search query filter
+    // Comprehensive Search query filter
     if (searchQuery) {
-      filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(searchQuery) ||
-        (item.description && item.description.toLowerCase().includes(searchQuery))
-      );
+      filtered = filtered.filter(item => {
+        const nameMatch = (item.name || "").toLowerCase().includes(searchQuery);
+        const descMatch = (item.description || "").toLowerCase().includes(searchQuery);
+        const catObj = categories.find(c => {
+          const raw = typeof item.category_id === "object"
+            ? (item.category_id?.$oid || item.category_id?.id || item.category_id?._id || String(item.category_id))
+            : String(item.category_id || "");
+          return c.id === raw || c._id === raw || c.name === raw;
+        });
+        const catMatch = catObj && (catObj.name || "").toLowerCase().includes(searchQuery);
+        const dietMatch = (searchQuery === "veg" && item.is_vegetarian) ||
+                          (searchQuery === "nonveg" && !item.is_vegetarian) ||
+                          (searchQuery === "non-veg" && !item.is_vegetarian);
+        return nameMatch || descMatch || catMatch || dietMatch;
+      });
     }
 
     const countLabel = document.getElementById("pos-dishes-count-label");
@@ -161,15 +220,16 @@ const POS = (() => {
       container.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 3.5rem 1.5rem; color: var(--text-dim);">
           <div style="font-size: 3rem; margin-bottom: 0.75rem;">🍽️</div>
-          <p style="font-size: 1.05rem; font-weight: 600; color: var(--text-main);">No dishes match your filter</p>
+          <p style="font-size: 1.05rem; font-weight: 600; color: var(--text-main);">No dishes match "${escapeHtml(searchQuery || 'your filter')}"</p>
           <span style="font-size: 0.85rem; display: block; margin-bottom: 1.25rem;">Try choosing a different category or clearing search</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('pos-search-input').value=''; POS.search(''); POS.filterCategory('all');" style="margin-right: 0.5rem;">Clear Search</button>
           <button type="button" class="btn btn-primary btn-sm" onclick="MenuMgmt.openAddItemModal()">+ Add New Dish</button>
         </div>`;
       return;
     }
 
     const user = API.getCurrentUser();
-    const canManageMenu = user && ["ADMIN", "MANAGER", "CHEF"].includes((user.role || "").toUpperCase());
+    const canManageMenu = user && ["ADMIN", "MANAGER", "CHEF", "WAITER", "CASHIER"].includes((user.role || "").toUpperCase());
 
     const cardsHtml = filtered.map(item => {
       const id = item.id || item._id;
@@ -359,6 +419,7 @@ const POS = (() => {
     const item = cart.find(c => c.itemId === itemId);
     cart = cart.filter(c => c.itemId !== itemId);
     renderCart();
+    renderMenuItems();
     if (item) App.showToast(`Removed "${item.name}" from cart`, "info");
   }
 
@@ -488,6 +549,7 @@ const POS = (() => {
     getActiveCategoryId: () => (activeCategoryId === "all" ? null : activeCategoryId),
     getItem,
     onNewItemAdded,
+    removeDishFromDisplay,
     refresh: init
   };
 })();

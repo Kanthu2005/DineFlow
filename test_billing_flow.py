@@ -1,10 +1,11 @@
 import urllib.request
 import json
+import time
 
 BASE = 'http://127.0.0.1:8000/api'
 
 # 1. Login Admin
-login_data = json.dumps({'email': 'admin@dineflow.com', 'password': 'Admin123!'}).encode('utf-8')
+login_data = json.dumps({'email': 'admin@dineflow.com', 'password': 'Password123!'}).encode('utf-8')
 req = urllib.request.Request(f'{BASE}/auth/login', data=login_data, headers={'Content-Type': 'application/json'})
 with urllib.request.urlopen(req) as resp:
     token = json.loads(resp.read().decode())['access_token']
@@ -49,7 +50,7 @@ pay_payload = json.dumps({
     'invoice_id': inv_id,
     'amount': float(inv['total_amount']),
     'payment_method': 'UPI',
-    'transaction_reference': 'UPI-REF-98765',
+    'transaction_reference': f'UPI-REF-{int(time.time()*1000)}',
     'recorded_by': 'Admin'
 }).encode('utf-8')
 req = urllib.request.Request(f'{BASE}/payments', data=pay_payload, headers=headers)

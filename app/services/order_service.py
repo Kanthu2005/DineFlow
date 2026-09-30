@@ -90,6 +90,12 @@ class OrderService:
             metadata={"order_number": order_number, "order_type": order_type},
         )
 
+        items_list = get_field(data, "items")
+        if items_list:
+            for itm in items_list:
+                OrderItemService.add_item(created["id"], itm)
+            created = OrderService.get_order(created["id"])
+
         return created
 
     @staticmethod

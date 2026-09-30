@@ -29,6 +29,8 @@ def create_order(
     current_user: dict = Depends(require_roles("ADMIN", "MANAGER", "WAITER", "CASHIER")),
 ):
     try:
+        if not data.created_by:
+            data.created_by = current_user.get("name") or current_user.get("email") or "Staff"
         return OrderService.create_order(data)
     except Exception as e:
         handle_error(e)
