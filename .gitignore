@@ -63,6 +63,7 @@ ENV/
 env.bak/
 venv.bak/
 !*.env.example
+.env.example
 
 # IDEs and Editors
 .vscode/
