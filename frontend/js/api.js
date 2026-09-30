@@ -7,7 +7,7 @@ const API = (() => {
   // Determine default base URL (supports Vercel/cloud deployment as well as local dev)
   const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:";
   const isSameOriginBackend = !isLocalHost || window.location.port === "8000";
-  const defaultBaseUrl = isSameOriginBackend ? "/api" : "https://flourishing-lokum-5daf58.netlify.app/api";
+  const defaultBaseUrl = isSameOriginBackend ? "/api" : "https://dineflow2005.netlify.app/api";
 
   const savedBaseUrl = localStorage.getItem("dineflow_api_url");
   const useSavedUrl = savedBaseUrl && (isLocalHost || (!savedBaseUrl.includes("localhost") && !savedBaseUrl.includes("127.0.0.1")));
