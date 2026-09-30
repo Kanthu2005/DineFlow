@@ -7,7 +7,7 @@ const API = (() => {
   // Determine default base URL (supports Vercel/cloud deployment as well as local dev)
   const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:";
   const isSameOriginBackend = !isLocalHost || window.location.port === "8000";
-  const defaultBaseUrl = isSameOriginBackend ? "/api" : "http://localhost:8000/api";
+  const defaultBaseUrl = isSameOriginBackend ? "/api" : "https://flourishing-lokum-5daf58.netlify.app/api";
 
   const savedBaseUrl = localStorage.getItem("dineflow_api_url");
   const useSavedUrl = savedBaseUrl && (isLocalHost || (!savedBaseUrl.includes("localhost") && !savedBaseUrl.includes("127.0.0.1")));
@@ -84,7 +84,7 @@ const API = (() => {
         if (!errorMsg) {
           errorMsg = `Request failed with status ${response.status}`;
         }
-        
+
         // Handle unauthorized token expiry - auto re-authenticate as default admin so user is never blocked
         if (response.status === 401 && !options._retried) {
           try {
@@ -135,7 +135,7 @@ const API = (() => {
       try {
         const res = await fetch(`${rootUrl}/health`);
         if (res.ok) return await res.json();
-      } catch {}
+      } catch { }
       const res = await fetch(`${baseUrl}/health`);
       return await res.json();
     },
