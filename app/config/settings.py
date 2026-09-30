@@ -3,8 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
 
-    MONGO_URL: str
-    DATABASE_NAME: str
+    MONGO_URL: str = "mongodb://localhost:27017"
+    DATABASE_NAME: str = "restaurant_management"
 
     APP_NAME: str = "Restaurant Management System"
     DEBUG: bool = True
