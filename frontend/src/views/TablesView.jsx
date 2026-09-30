@@ -20,6 +20,8 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
   const { role, permissions } = useAuth();
   const { showToast } = useToast();
 
+  const canManageTables = role === 'ADMIN' || role === 'MANAGER';
+
   const [tables, setTables] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,21 +81,29 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
 
   const handleCreateTable = async (e) => {
     e.preventDefault();
+    if (!canManageTables) {
+      showToast('Only Admin or Manager can add new tables', 'warning');
+      return;
+    }
     if (!tableNumber) {
       showToast('Please enter a table number', 'warning');
       return;
     }
+    const numStr = tableNumber.toString().trim();
+    const formattedNum = numStr.toUpperCase().startsWith('T')
+      ? numStr.toUpperCase()
+      : `T${numStr}`;
     setSubmitting(true);
     try {
-      const res = await api.tables.create({
-        table_number: parseInt(tableNumber) || tableNumber,
+      await api.tables.create({
+        table_number: formattedNum,
         capacity: parseInt(capacity) || 4,
         location: zone,
       });
-      showToast(`Table ${tableNumber} configured successfully!`, 'success');
-      setTables(prev => [...prev, res]);
+      showToast(`Table ${formattedNum} configured successfully!`, 'success');
       setShowAddModal(false);
       setTableNumber('');
+      await loadData();
     } catch (err) {
       showToast(err.message || 'Failed to create table', 'danger');
     } finally {
@@ -183,10 +193,12 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
             <Calendar size={16} />
             <span>Book Reservation</span>
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
-            <Plus size={16} />
-            <span>Add New Table</span>
-          </button>
+          {canManageTables && (
+            <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
+              <Plus size={16} />
+              <span>Add New Table</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -392,11 +404,10 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
                   >
                     {/* Header: Table Number & Status Badge */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div
                           style={{
-                            width: '38px',
-                            height: '38px',
+                            padding: '4px 12px',
                             borderRadius: 'var(--radius-md)',
                             background: isAvailable 
                               ? 'rgba(16, 185, 129, 0.15)' 
@@ -408,16 +419,21 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
                             justifyContent: 'center',
                             fontWeight: 800,
                             fontFamily: 'Outfit',
-                            fontSize: '1.1rem',
+                            fontSize: '1.35rem',
+                            letterSpacing: '0.02em',
                             color: isAvailable ? '#10b981' : isOccupied ? '#ef4444' : '#f59e0b',
+                            border: `1px solid ${isAvailable ? 'rgba(16, 185, 129, 0.3)' : isOccupied ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                            minWidth: '52px',
                           }}
                         >
-                          {table.table_number}
+                          {table.table_number?.toString().toUpperCase().startsWith('T') ? table.table_number : `T${table.table_number}`}
                         </div>
                         <div>
-                          <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>Table {table.table_number}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            {table.location ? table.location.replace('_', ' ') : 'MAIN HALL'}
+                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {table.location ? table.location.replace(/_/g, ' ') : 'MAIN DINING'}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {table.capacity} Seats &bull; {table.status}
                           </div>
                         </div>
                       </div>
@@ -671,15 +687,18 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
 
             <form onSubmit={handleCreateTable} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Table Number *</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Table Number / Identifier *</label>
                 <input
-                  type="number"
+                  type="text"
                   required
-                  placeholder="e.g. 12"
+                  placeholder="e.g. 13 or T13"
                   value={tableNumber}
                   onChange={e => setTableNumber(e.target.value)}
                   className="input"
                 />
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Will be formatted automatically as simple ID like <strong>T13</strong>
+                </div>
               </div>
 
               <div>
@@ -696,10 +715,12 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Floor Zone Location</label>
                 <select value={zone} onChange={e => setZone(e.target.value)} className="select">
-                  <option value="MAIN_HALL">Main Dining Hall</option>
+                  <option value="MAIN_DINING">Main Dining</option>
+                  <option value="FAMILY_SECTION">Family Section</option>
+                  <option value="WINDOW_BAY">Window Bay</option>
+                  <option value="OUTDOOR_PATIO">Outdoor Patio</option>
                   <option value="TERRACE">Open Terrace Garden</option>
                   <option value="VIP_LOUNGE">VIP Executive Lounge</option>
-                  <option value="FAMILY_SECTION">Family Section</option>
                 </select>
               </div>
 
@@ -763,7 +784,7 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
                     <option value="">-- Choose Table --</option>
                     {tables.map(t => (
                       <option key={t.id} value={t.id}>
-                        Table {t.table_number} ({t.capacity} Seats) &mdash; {t.status}
+                        {t.table_number?.toString().toUpperCase().startsWith('T') ? t.table_number : `T${t.table_number}`} ({t.capacity} Seats) &mdash; {t.status}
                       </option>
                     ))}
                   </select>

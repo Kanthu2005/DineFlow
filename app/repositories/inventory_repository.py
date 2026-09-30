@@ -12,7 +12,7 @@ from app.database.mongodb import (
     stock_movements_collection,
 )
 from app.repositories.base_repository import BaseRepository
-from app.services.common import to_object_id, serialize_document, serialize_documents, decimal128, now_utc
+from app.utils.mongo_utils import to_object_id, serialize_document, serialize_documents, decimal128, now_utc
 
 
 class IngredientRepository(BaseRepository):
@@ -48,7 +48,12 @@ class IngredientRepository(BaseRepository):
         oid = to_object_id(ingredient_id)
         self.collection.update_one(
             {"_id": oid},
-            {"$inc": {"available_quantity": decimal128(delta)}}
+            {
+                "$inc": {
+                    "available_quantity": decimal128(delta),
+                    "current_stock": decimal128(delta),
+                }
+            }
         )
         return self.find_by_id(oid)
 
@@ -56,18 +61,40 @@ class IngredientRepository(BaseRepository):
     def record_movement(self, movement_data: Dict[str, Any]) -> Dict[str, Any]:
         if "created_at" not in movement_data:
             movement_data["created_at"] = now_utc()
+        if "unit" not in movement_data and "ingredient_id" in movement_data:
+            ing = self.collection.find_one({"_id": to_object_id(movement_data["ingredient_id"])})
+            if ing:
+                movement_data["unit"] = ing.get("unit")
         res = self.movements_col.insert_one(movement_data)
         movement_data["_id"] = res.inserted_id
         return serialize_document(movement_data)
 
     def find_movements_by_ingredient(self, ingredient_id: str | ObjectId) -> List[Dict[str, Any]]:
         oid = to_object_id(ingredient_id)
-        docs = self.movements_col.find({"ingredient_id": oid}).sort("created_at", -1)
-        return serialize_documents(docs)
+        docs = list(self.movements_col.find({"ingredient_id": oid}).sort("created_at", -1))
+        ing = self.collection.find_one({"_id": oid})
+        ing_name = ing.get("name") if ing else None
+        serialized = serialize_documents(docs)
+        for doc in serialized:
+            if ing_name:
+                doc["ingredient_name"] = ing_name
+        return serialized
 
-    def find_all_movements(self) -> List[Dict[str, Any]]:
-        docs = self.movements_col.find().sort("created_at", -1)
-        return serialize_documents(docs)
+    def find_all_movements(self, limit: int = 100) -> List[Dict[str, Any]]:
+        docs = list(self.movements_col.find().sort("created_at", -1).limit(limit))
+        serialized = serialize_documents(docs)
+        # Cache ingredient names
+        ing_cache = {}
+        for doc in serialized:
+            ing_id = str(doc.get("ingredient_id"))
+            if ing_id not in ing_cache:
+                ing = self.collection.find_one({"_id": to_object_id(ing_id)})
+                ing_cache[ing_id] = (ing.get("name"), ing.get("unit")) if ing else (None, None)
+            name, unit = ing_cache[ing_id]
+            doc["ingredient_name"] = name
+            if not doc.get("unit"):
+                doc["unit"] = unit
+        return serialized
 
 
 class RecipeRepository(BaseRepository):

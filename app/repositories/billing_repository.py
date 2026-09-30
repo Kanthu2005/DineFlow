@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from app.database.mongodb import invoices_collection, payments_collection, refunds_collection
 from app.repositories.base_repository import BaseRepository
-from app.services.common import to_object_id, serialize_document, serialize_documents
+from app.utils.mongo_utils import to_object_id, serialize_document, serialize_documents
 
 
 class BillingRepository(BaseRepository):

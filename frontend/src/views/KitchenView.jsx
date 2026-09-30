@@ -134,8 +134,13 @@ export default function KitchenView() {
                         {ticket.priority || 'NORMAL'}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Order Ref: #{ticket.order_id?.slice(-6) || 'Direct'}
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>Order #{ticket.order_number || ticket.order_id?.slice(-6) || 'Direct'}</span>
+                      {ticket.table_number && (
+                        <span style={{ fontWeight: 800, color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.15)', padding: '1px 6px', borderRadius: '4px' }}>
+                          {ticket.table_number.toString().toUpperCase().startsWith('T') ? ticket.table_number : `T${ticket.table_number}`}
+                        </span>
+                      )}
                     </div>
                   </div>
 

@@ -108,7 +108,8 @@ class PaymentService:
 
             # Mark order as COMPLETED
             order_id = str(invoice["order_id"])
-            order_repo.update(order_id, {"status": "COMPLETED"})
+            from app.services.order_service import OrderService
+            OrderService.update_status(order_id, "COMPLETED", performed_by=recorded_by, role="CASHIER")
 
             # Business Rule: Release table after payment for dine-in orders
             order = order_repo.find_by_id(order_id)

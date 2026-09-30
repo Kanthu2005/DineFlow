@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth, PRESET_ACCOUNTS } from '../context/AuthContext';
+import { useAuth, PRESET_ACCOUNTS, ROLE_PERMISSIONS } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { 
   Search, Sun, Moon, Database, Shield, ChevronDown, Check, 

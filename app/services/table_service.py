@@ -17,8 +17,27 @@ order_repo = OrderRepository()
 class RestaurantTableService:
 
     @staticmethod
+    def normalize_table_number(val: Any) -> str:
+        s = str(val or "").strip()
+        if not s:
+            return s
+        if s.isdigit():
+            return f"T{s}"
+        upper = s.upper()
+        if upper.startswith("TABLE "):
+            num_part = upper[6:].strip()
+            return f"T{num_part}" if num_part.isdigit() else upper
+        if upper.startswith("TABLE"):
+            num_part = upper[5:].strip()
+            return f"T{num_part}" if num_part.isdigit() else upper
+        if upper.startswith("T") and upper[1:].isdigit():
+            return f"T{upper[1:]}"
+        return s
+
+    @staticmethod
     def create_table(data: Any) -> Dict[str, Any]:
-        number = str(get_field(data, "table_number", ""))
+        raw_number = get_field(data, "table_number", "")
+        number = RestaurantTableService.normalize_table_number(raw_number)
         capacity = int(get_field(data, "capacity", 0))
         location = str(get_field(data, "location", "Ground Floor"))
         is_active = bool(get_field(data, "is_active", True))
@@ -46,7 +65,15 @@ class RestaurantTableService:
 
     @staticmethod
     def get_tables() -> List[Dict[str, Any]]:
-        return table_repo.find_all(sort_field="table_number", sort_dir=1)
+        tables = table_repo.find_all(sort_field="table_number", sort_dir=1)
+        def sort_key(t):
+            num_str = str(t.get("table_number", "")).upper()
+            if num_str.startswith("T") and num_str[1:].isdigit():
+                return (0, int(num_str[1:]))
+            if num_str.isdigit():
+                return (0, int(num_str))
+            return (1, num_str)
+        return sorted(tables, key=sort_key)
 
     @staticmethod
     def get_table(table_id: str) -> Dict[str, Any]:

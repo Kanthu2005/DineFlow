@@ -103,6 +103,19 @@ class IngredientService:
         return updated
 
     @staticmethod
+    def delete_ingredient(ingredient_id: str) -> Dict[str, Any]:
+        # Check if used in recipes
+        used_count = recipes_collection.count_documents({"ingredient_id": to_object_id(ingredient_id)})
+        if used_count > 0:
+            # Clean up recipe references or block
+            recipes_collection.delete_many({"ingredient_id": to_object_id(ingredient_id)})
+
+        deleted = repo.delete(ingredient_id)
+        if not deleted:
+            raise ValueError("Ingredient not found")
+        return {"message": "Ingredient deleted successfully", "id": ingredient_id}
+
+    @staticmethod
     def update_stock(ingredient_id: str, quantity: Decimal | float | int | str, movement_type: str = "MANUAL_ADJUSTMENT", reference_type: Optional[str] = None, reference_id: Optional[str] = None, created_by: str = "SYSTEM") -> Dict[str, Any]:
         dec_qty = Decimal(str(quantity))
         item = IngredientService.get_ingredient(ingredient_id)
@@ -231,3 +244,49 @@ class IngredientService:
             })
 
         return capacity_reports
+
+    @staticmethod
+    def get_inventory_dashboard() -> Dict[str, Any]:
+        """
+        Provides complete inventory dashboard metrics:
+        - Total Ingredients
+        - Low Stock Items
+        - Out of Stock Items
+        - Recent Stock Movements
+        - Today's Consumption
+        """
+        all_ingredients = repo.find_all(sort_field="name", sort_dir=1)
+        total_count = len(all_ingredients)
+        low_stock = []
+        out_of_stock = []
+
+        for ing in all_ingredients:
+            avail = Decimal(str(ing["available_quantity"]))
+            min_lvl = Decimal(str(ing["minimum_stock_level"]))
+            if avail <= 0:
+                out_of_stock.append(ing)
+            elif avail <= min_lvl:
+                low_stock.append(ing)
+
+        recent_movements = repo.find_all_movements(limit=20)
+
+        # Today's consumption (ORDER_DEDUCTION movements today)
+        today_iso = now_utc().strftime("%Y-%m-%d")
+        today_consumption = []
+        for m in recent_movements:
+            m_time = m.get("created_at")
+            if m.get("movement_type") == "ORDER_DEDUCTION":
+                m_str = m_time.isoformat() if hasattr(m_time, "isoformat") else str(m_time or "")
+                if m_str.startswith(today_iso):
+                    today_consumption.append(m)
+
+        return {
+            "total_ingredients": total_count,
+            "low_stock_count": len(low_stock),
+            "out_of_stock_count": len(out_of_stock),
+            "low_stock_items": low_stock,
+            "out_of_stock_items": out_of_stock,
+            "recent_movements": recent_movements,
+            "today_consumption_count": len(today_consumption),
+            "today_consumption": today_consumption,
+        }

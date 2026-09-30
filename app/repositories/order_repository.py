@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from app.database.mongodb import orders_collection, order_items_collection
 from app.repositories.base_repository import BaseRepository
-from app.services.common import to_object_id, serialize_document, serialize_documents, now_utc
+from app.utils.mongo_utils import to_object_id, serialize_document, serialize_documents, now_utc
 
 
 class OrderRepository(BaseRepository):
@@ -41,8 +41,14 @@ class OrderRepository(BaseRepository):
 
     def find_order_items(self, order_id: str | ObjectId) -> List[Dict[str, Any]]:
         oid = to_object_id(order_id)
-        docs = self.items_col.find({"order_id": oid})
-        return serialize_documents(docs)
+        docs = list(self.items_col.find({"order_id": oid}))
+        serialized = serialize_documents(docs)
+        for item in serialized:
+            if "name" not in item and "item_name_snapshot" in item:
+                item["name"] = item["item_name_snapshot"]
+            if "price" not in item and "unit_price_snapshot" in item:
+                item["price"] = item["unit_price_snapshot"]
+        return serialized
 
     def find_order_item(self, item_id: str | ObjectId) -> Optional[Dict[str, Any]]:
         oid = to_object_id(item_id)

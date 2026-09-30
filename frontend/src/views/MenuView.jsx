@@ -50,20 +50,30 @@ export default function MenuView() {
   // Delete Confirm Modal
   const [itemToDelete, setItemToDelete] = useState(null);
 
-  // Recipe View Modal
+  // Recipe Configuration & BOM Modal
   const [recipeItem, setRecipeItem] = useState(null);
   const [recipeLoading, setRecipeLoading] = useState(false);
   const [recipeIngredients, setRecipeIngredients] = useState([]);
+  const [recipeAvailability, setRecipeAvailability] = useState(null);
+  const [inventoryList, setInventoryList] = useState([]);
+  const [selectedIngId, setSelectedIngId] = useState('');
+  const [ingQty, setIngQty] = useState('');
+  const [ingUnit, setIngUnit] = useState('GRAM');
+  const [savingRecipe, setSavingRecipe] = useState(false);
+  const [availabilityMap, setAvailabilityMap] = useState({});
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [itRes, catRes] = await Promise.all([
+      const [itRes, catRes, availRes] = await Promise.all([
         api.menu.getItems(),
         api.menu.getCategories(),
+        api.menu.getAvailability().catch(() => ({})),
       ]);
       setItems(Array.isArray(itRes) ? itRes : []);
       setCategories(Array.isArray(catRes) ? catRes : []);
+      const availObj = availRes?.items || availRes || {};
+      setAvailabilityMap(typeof availObj === 'object' ? availObj : {});
     } catch (err) {
       console.error('Menu load error:', err);
       showToast('Could not load menu catalog', 'error');
@@ -190,14 +200,70 @@ export default function MenuView() {
     setRecipeItem(item);
     setRecipeLoading(true);
     setRecipeIngredients([]);
+    setRecipeAvailability(null);
     try {
-      const res = await api.recipes.getByMenuItem(item.id);
+      const [res, avail, inv] = await Promise.all([
+        api.recipes.getByMenuItem(item.id).catch(() => []),
+        api.menu.getItemAvailability(item.id).catch(() => null),
+        api.inventory.getIngredients().catch(() => []),
+      ]);
       setRecipeIngredients(Array.isArray(res) ? res : []);
-    } catch {
-      // Fallback display if no backend recipe is linked yet
+      setRecipeAvailability(avail);
+      const invItems = Array.isArray(inv) ? inv : [];
+      setInventoryList(invItems);
+      if (invItems.length > 0) {
+        setSelectedIngId(invItems[0].id);
+        const firstUnit = invItems[0].unit;
+        setIngUnit(firstUnit === 'KG' ? 'GRAM' : (firstUnit === 'LITRE' ? 'ML' : firstUnit));
+      }
+      setIngQty('');
+    } catch (err) {
+      console.error('Recipe load error:', err);
       setRecipeIngredients([]);
     } finally {
       setRecipeLoading(false);
+    }
+  };
+
+  const handleAddIngredient = async (e) => {
+    e.preventDefault();
+    if (!selectedIngId || !ingQty || !recipeItem) return;
+    setSavingRecipe(true);
+    try {
+      await api.recipes.addIngredient(recipeItem.id, {
+        ingredient_id: selectedIngId,
+        quantity_required: parseFloat(ingQty),
+        unit: ingUnit,
+      });
+      showToast('Recipe ingredient saved successfully!', 'success');
+      // Refresh recipe and availability
+      const [res, avail] = await Promise.all([
+        api.recipes.getByMenuItem(recipeItem.id),
+        api.menu.getItemAvailability(recipeItem.id),
+      ]);
+      setRecipeIngredients(Array.isArray(res) ? res : []);
+      setRecipeAvailability(avail);
+      setIngQty('');
+    } catch (err) {
+      showToast(err.message || 'Failed to update recipe ingredient', 'danger');
+    } finally {
+      setSavingRecipe(false);
+    }
+  };
+
+  const handleDeleteIngredient = async (ingredientId) => {
+    if (!recipeItem) return;
+    try {
+      await api.recipes.deleteIngredient(recipeItem.id, ingredientId);
+      showToast('Ingredient removed from recipe', 'success');
+      const [res, avail] = await Promise.all([
+        api.recipes.getByMenuItem(recipeItem.id),
+        api.menu.getItemAvailability(recipeItem.id),
+      ]);
+      setRecipeIngredients(Array.isArray(res) ? res : []);
+      setRecipeAvailability(avail);
+    } catch (err) {
+      showToast(err.message || 'Failed to remove ingredient', 'danger');
     }
   };
 
@@ -441,6 +507,10 @@ export default function MenuView() {
           {filteredItems.map(item => {
             const isAvailable = item.is_available !== false;
             const categoryObj = categories.find(c => c.id === item.category_id);
+            const availInfo = availabilityMap[item.id];
+            const isOutOfStock = availInfo?.status === 'OUT_OF_STOCK';
+            const isLowStock = availInfo?.status === 'LOW_STOCK';
+            const maxPortions = availInfo?.max_portions;
 
             return (
               <div
@@ -451,9 +521,13 @@ export default function MenuView() {
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
-                  opacity: isAvailable ? 1 : 0.65,
+                  opacity: isAvailable && !isOutOfStock ? 1 : 0.75,
                   transition: 'all 0.25s ease',
-                  border: isAvailable ? '1px solid var(--border-subtle)' : '1px dashed rgba(239, 68, 68, 0.4)',
+                  border: isOutOfStock 
+                    ? '1px dashed rgba(239, 68, 68, 0.5)' 
+                    : isAvailable 
+                    ? '1px solid var(--border-subtle)' 
+                    : '1px dashed rgba(239, 68, 68, 0.4)',
                 }}
               >
                 {/* Dish Image Banner */}
@@ -501,31 +575,55 @@ export default function MenuView() {
                     </span>
                   </div>
 
-                  {/* Top Right: Stock Status Toggle Button */}
-                  <button
-                    onClick={() => handleToggleAvailability(item)}
-                    title={isAvailable ? 'Mark as Sold Out' : 'Mark as In Stock'}
-                    style={{
-                      position: 'absolute',
-                      top: '10px',
-                      right: '10px',
-                      padding: '4px 10px',
-                      borderRadius: 'var(--radius-full)',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      background: isAvailable ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)',
-                      color: '#ffffff',
-                      border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    {isAvailable ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                    <span>{isAvailable ? 'AVAILABLE' : 'SOLD OUT'}</span>
-                  </button>
+                  {/* Top Right: Stock Status Toggle Button & Live Availability Badge */}
+                  <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <button
+                      onClick={() => handleToggleAvailability(item)}
+                      title={isAvailable ? 'Mark as Sold Out' : 'Mark as In Stock'}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: 'var(--radius-full)',
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        background: isAvailable ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)',
+                        color: '#ffffff',
+                        border: 'none',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {isAvailable ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
+                      <span>{isAvailable ? 'AVAILABLE' : 'SOLD OUT'}</span>
+                    </button>
+
+                    {availInfo && (
+                      <span
+                        style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          background: isOutOfStock
+                            ? 'rgba(239, 68, 68, 0.95)'
+                            : isLowStock
+                            ? 'rgba(245, 158, 11, 0.95)'
+                            : 'rgba(16, 185, 129, 0.9)',
+                          color: '#ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        {isOutOfStock
+                          ? '🔴 OUT OF STOCK'
+                          : isLowStock
+                          ? `🟡 LIMITED (${maxPortions} left)`
+                          : `🟢 IN STOCK (${maxPortions != null ? maxPortions + ' left' : 'READY'})`}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Bottom Over Image: Prep Time */}
                   <div
@@ -627,67 +725,232 @@ export default function MenuView() {
         </div>
       )}
 
-      {/* Recipe / Ingredients Modal */}
+      {/* Recipe / Ingredients BOM Configuration Modal */}
       {recipeItem && (
         <div className="modal-overlay" onClick={() => setRecipeItem(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: '28px', maxWidth: '520px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: '28px', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
-                  <ChefHat size={20} />
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+                  <ChefHat size={22} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Recipe & Ingredients</h2>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{recipeItem.name}</div>
+                  <h2 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Recipe & Bill of Materials</h2>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {recipeItem.name} • 1 Plate / Portion
+                  </div>
                 </div>
               </div>
               <button onClick={() => setRecipeItem(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
+            {/* Availability / Capacity Banner */}
             {recipeLoading ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                Loading recipe mapping...
-              </div>
-            ) : recipeIngredients.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  MAPPED INVENTORY INGREDIENTS
-                </div>
-                {recipeIngredients.map((r, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border-subtle)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span style={{ fontWeight: 600 }}>{r.ingredient_name || r.name || `Ingredient #${i+1}`}</span>
-                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>
-                      {r.quantity_required || r.quantity || 1} {r.unit || 'units'}
-                    </span>
-                  </div>
-                ))}
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Loading recipe mapping and live warehouse stock...
               </div>
             ) : (
-              <div style={{ padding: '20px', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', marginBottom: '18px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Standard Culinary Preparation</div>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Kitchen prep time: <strong>{recipeItem.preparation_time || 15} minutes</strong>. Requires standard restaurant inventory provisions.
-                </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Starter Exemption Info */}
+                {recipeIngredients.length === 0 && (
+                  <div style={{ padding: '14px 18px', borderRadius: 'var(--radius-md)', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.3)', fontSize: '0.825rem', color: '#60a5fa', lineHeight: 1.4 }}>
+                    <strong>ℹ No Main Stock Deduction Mapped:</strong> Starters and items without a recipe do not deduct warehouse ingredients. To track inventory for this dish, add raw materials below.
+                  </div>
+                )}
+
+                {/* Live Stock Capacity Indicator */}
+                {recipeIngredients.length > 0 && recipeAvailability && (
+                  <div
+                    style={{
+                      padding: '14px 18px',
+                      borderRadius: 'var(--radius-md)',
+                      background: recipeAvailability.status === 'AVAILABLE'
+                        ? 'rgba(16, 185, 129, 0.12)'
+                        : recipeAvailability.status === 'LOW_STOCK'
+                        ? 'rgba(245, 158, 11, 0.12)'
+                        : 'rgba(239, 68, 68, 0.12)',
+                      border: `1px solid ${
+                        recipeAvailability.status === 'AVAILABLE'
+                          ? 'rgba(16, 185, 129, 0.3)'
+                          : recipeAvailability.status === 'LOW_STOCK'
+                          ? 'rgba(245, 158, 11, 0.3)'
+                          : 'rgba(239, 68, 68, 0.3)'
+                      }`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          color: recipeAvailability.status === 'AVAILABLE'
+                            ? 'var(--success)'
+                            : recipeAvailability.status === 'LOW_STOCK'
+                            ? 'var(--warning)'
+                            : 'var(--danger)',
+                        }}
+                      >
+                        {recipeAvailability.status === 'AVAILABLE' && '🟢 IN STOCK & PREPARABLE'}
+                        {recipeAvailability.status === 'LOW_STOCK' && '🟡 LIMITED CAPACITY'}
+                        {recipeAvailability.status === 'OUT_OF_STOCK' && '🔴 INSUFFICIENT WAREHOUSE STOCK'}
+                      </span>
+                      <strong style={{ fontSize: '1rem', fontFamily: 'Outfit' }}>
+                        {recipeAvailability.max_portions} portions available
+                      </strong>
+                    </div>
+
+                    {recipeAvailability.shortages && recipeAvailability.shortages.length > 0 && (
+                      <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '0.78rem', color: '#f87171' }}>
+                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>Shortage Breakdown:</div>
+                        {recipeAvailability.shortages.map((s, idx) => (
+                          <div key={idx}>
+                            • <strong>{s.ingredient_name}</strong>: Requires {s.required} {s.unit}, only {s.available} {s.unit} available in stock (Shortage: {s.shortage} {s.unit})
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Mapped Recipe Ingredients List */}
+                <div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', letterSpacing: '0.04em' }}>
+                    RECIPE BILL OF MATERIALS (PER 1 PORTION)
+                  </div>
+
+                  {recipeIngredients.length === 0 ? (
+                    <div style={{ padding: '20px', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      No raw materials mapped yet for this dish.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {recipeIngredients.map((ing, idx) => (
+                        <div
+                          key={ing.id || idx}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 14px',
+                            borderRadius: 'var(--radius-md)',
+                            background: 'var(--bg-tertiary)',
+                            border: '1px solid var(--border-subtle)',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 700 }}>{ing.ingredient_name || ing.name}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              Warehouse Stock: {ing.available_stock != null ? `${ing.available_stock} ${ing.ingredient_unit || ing.unit}` : 'Available'}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontWeight: 800, color: 'var(--accent)', fontFamily: 'Outfit' }}>
+                              {ing.quantity_required} {ing.unit}
+                            </span>
+                            {canManageMenu && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteIngredient(ing.ingredient_id)}
+                                className="btn btn-danger btn-sm"
+                                title="Remove from Recipe"
+                                style={{ padding: '5px 8px' }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add / Edit Recipe Ingredient Form (Admin/Chef) */}
+                {canManageMenu && (
+                  <form onSubmit={handleAddIngredient} style={{ marginTop: '8px', padding: '16px', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>
+                      + Add / Update Raw Material in Recipe
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ingredient</label>
+                        <select
+                          value={selectedIngId}
+                          onChange={e => {
+                            setSelectedIngId(e.target.value);
+                            const found = inventoryList.find(i => i.id === e.target.value);
+                            if (found) {
+                              const u = found.unit;
+                              setIngUnit(u === 'KG' ? 'GRAM' : (u === 'LITRE' ? 'ML' : u));
+                            }
+                          }}
+                          className="select"
+                          style={{ height: '36px', fontSize: '0.8rem' }}
+                        >
+                          {inventoryList.map(inv => (
+                            <option key={inv.id} value={inv.id}>
+                              {inv.name} ({inv.current_stock} {inv.unit} in stock)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Qty / Plate</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          min="0.01"
+                          placeholder="e.g. 250"
+                          value={ingQty}
+                          onChange={e => setIngQty(e.target.value)}
+                          className="input"
+                          style={{ height: '36px', fontSize: '0.8rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Unit</label>
+                        <select
+                          value={ingUnit}
+                          onChange={e => setIngUnit(e.target.value)}
+                          className="select"
+                          style={{ height: '36px', fontSize: '0.8rem' }}
+                        >
+                          <option value="GRAM">g (grams)</option>
+                          <option value="KG">kg (kilograms)</option>
+                          <option value="ML">ml (millilitres)</option>
+                          <option value="LITRE">L (litres)</option>
+                          <option value="PIECE">piece</option>
+                          <option value="PACKET">packet</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={savingRecipe || !selectedIngId || !ingQty}
+                      className="btn btn-primary btn-sm"
+                      style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                    >
+                      {savingRecipe ? 'Saving...' : 'Save Ingredient to Recipe'}
+                    </button>
+                  </form>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                  <button onClick={() => setRecipeItem(null)} className="btn btn-secondary">
+                    Close Recipe Builder
+                  </button>
+                </div>
               </div>
             )}
-
-            <button onClick={() => setRecipeItem(null)} className="btn btn-secondary" style={{ width: '100%' }}>
-              Close Recipe View
-            </button>
           </div>
         </div>
       )}

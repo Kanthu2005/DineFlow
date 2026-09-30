@@ -286,6 +286,7 @@ class Recipe:
         ingredient_id: str,
         quantity_required: Decimal | float | int | str,
         recipe_id: Optional[str] = None,
+        unit: Optional[str] = None,
     ):
         qty = Decimal(str(quantity_required))
         if qty <= 0:
@@ -295,11 +296,54 @@ class Recipe:
         self.menu_item_id = menu_item_id
         self.ingredient_id = ingredient_id
         self.quantity_required = qty
+        self.unit = unit
 
     def calculate_required_quantity(self, multiplier: int) -> Decimal:
         if multiplier <= 0:
             raise ValueError("Multiplier must be positive")
         return self.quantity_required * Decimal(multiplier)
+
+
+class StockMovement:
+    """Represents an audit movement for raw material inventory."""
+
+    VALID_TYPES = [
+        "PURCHASE",
+        "MANUAL_ADD",
+        "ORDER_DEDUCTION",
+        "WASTAGE",
+        "ADJUSTMENT",
+        "RETURN",
+        "ORDER_RETURN",
+        "MANUAL_ADJUSTMENT",
+    ]
+
+    def __init__(
+        self,
+        ingredient_id: str,
+        movement_type: str,
+        quantity: Decimal | float | int | str,
+        unit: Optional[str] = None,
+        reference_type: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        created_by: Optional[str] = "SYSTEM",
+        movement_id: Optional[str] = None,
+    ):
+        qty = Decimal(str(quantity))
+        if qty <= 0:
+            raise ValueError("Movement quantity must be greater than zero")
+        m_type = movement_type.upper()
+        if m_type not in self.VALID_TYPES:
+            raise ValueError(f"Invalid movement type: {m_type}")
+
+        self.id = movement_id
+        self.ingredient_id = ingredient_id
+        self.movement_type = m_type
+        self.quantity = qty
+        self.unit = unit
+        self.reference_type = reference_type
+        self.reference_id = reference_id
+        self.created_by = created_by
 
 
 class RestaurantTable:

@@ -168,12 +168,18 @@ export const api = {
     createItem: (data) => request("/menu/items", { method: "POST", body: data }),
     updateItem: (id, data) => request(`/menu/items/${id}`, { method: "PUT", body: data }),
     deleteItem: (id) => request(`/menu/items/${id}`, { method: "DELETE" }),
+    getAvailability: () => request("/menu-items/availability"),
+    getItemAvailability: (id, quantity = 1) => request(`/menu-items/${id}/availability?quantity=${quantity}`),
   },
 
   // Recipes
   recipes: {
-    getByMenuItem: (menuItemId) => request(`/recipes/menu-item/${menuItemId}`),
+    getByMenuItem: (menuItemId) => request(`/menu-items/${menuItemId}/recipe`),
+    addIngredient: (menuItemId, data) => request(`/menu/${menuItemId}/recipe`, { method: "POST", body: data }),
     create: (data) => request("/recipes", { method: "POST", body: data }),
+    update: (id, data) => request(`/recipes/${id}`, { method: "PUT", body: data }),
+    delete: (id) => request(`/recipes/${id}`, { method: "DELETE" }),
+    deleteIngredient: (menuItemId, ingredientId) => request(`/menu/${menuItemId}/recipe/${ingredientId}`, { method: "DELETE" }),
   },
 
   // Tables
@@ -196,6 +202,9 @@ export const api = {
     getAll: () => request("/orders"),
     getOne: (id) => request(`/orders/${id}`),
     create: (data) => request("/orders", { method: "POST", body: data }),
+    confirm: (orderId) => request(`/orders/${orderId}/confirm`, { method: "POST" }),
+    complete: (orderId) => request(`/orders/${orderId}/complete`, { method: "POST" }),
+    validateCart: (items) => request("/orders/validate-cart", { method: "POST", body: { items } }),
     updateStatus: (id, status) => request(`/orders/${id}/status`, { method: "PATCH", body: { status } }),
     updateDiscount: (id, data) => request(`/orders/${id}/discount`, { method: "PATCH", body: data }),
     addItem: (orderId, itemData) => request(`/orders/${orderId}/items`, { method: "POST", body: itemData }),
@@ -231,12 +240,15 @@ export const api = {
 
   // Inventory
   inventory: {
-    getIngredients: () => request("/ingredients"),
-    getActiveIngredients: () => request("/ingredients/active"),
-    createIngredient: (data) => request("/ingredients", { method: "POST", body: data }),
-    updateStock: (id, quantity) => request(`/ingredients/${id}/stock`, { method: "POST", body: { quantity: Number(quantity) } }),
-    getStockStatus: (id) => request(`/ingredients/${id}/stock-status`),
-    getMovements: () => request("/stock-movements"),
+    getIngredients: () => request("/inventory"),
+    getActiveIngredients: () => request("/inventory/active"),
+    getDashboard: () => request("/inventory/dashboard"),
+    createIngredient: (data) => request("/inventory", { method: "POST", body: data }),
+    updateIngredient: (id, data) => request(`/inventory/${id}`, { method: "PUT", body: data }),
+    deleteIngredient: (id) => request(`/inventory/${id}`, { method: "DELETE" }),
+    updateStock: (id, quantity) => request(`/inventory/${id}/stock`, { method: "POST", body: { quantity: Number(quantity) } }),
+    getStockStatus: (id) => request(`/inventory/${id}/stock-status`),
+    getMovements: (limit = 100) => request(`/inventory/movements?limit=${limit}`),
     createMovement: (data) => request("/stock-movements", { method: "POST", body: data }),
   },
 

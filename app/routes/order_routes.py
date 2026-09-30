@@ -201,3 +201,69 @@ def recalculate_order(
         return OrderItemService.recalculate_order(order_id)
     except Exception as e:
         handle_error(e)
+
+
+# ==========================================
+# Inventory & Order Lifecycle Extensions
+# ==========================================
+
+class CartItemModel(BaseModel):
+    menu_item_id: str
+    quantity: int = 1
+
+
+class CartValidationRequest(BaseModel):
+    items: list[CartItemModel]
+
+
+@router.post("/orders/validate-cart")
+def validate_cart(
+    req: CartValidationRequest,
+    current_user: dict = Depends(require_roles("ADMIN", "MANAGER", "WAITER", "CASHIER", "CHEF")),
+):
+    """
+    Validates combined recipe ingredient requirements across an entire cart.
+    Returns any ingredient shortages without modifying inventory.
+    """
+    try:
+        from app.services.recipe_service import RecipeService
+        items_dict = [{"menu_item_id": i.menu_item_id, "quantity": i.quantity} for i in req.items]
+        return RecipeService.validate_cart(items_dict)
+    except Exception as e:
+        handle_error(e)
+
+
+@router.post("/orders/{order_id}/complete")
+def complete_order(
+    order_id: str,
+    current_user: dict = Depends(require_roles("ADMIN", "MANAGER", "WAITER", "CASHIER", "CHEF")),
+):
+    """
+    Marks order as COMPLETED, atomically deducting stock if not already deducted,
+    and releasing any assigned dining table.
+    """
+    try:
+        return OrderService.complete_order(
+            order_id=order_id,
+            performed_by=current_user.get("name", "SYSTEM"),
+            role=current_user.get("role", "SYSTEM"),
+        )
+    except Exception as e:
+        handle_error(e)
+
+
+@router.post("/orders/{order_id}/deduct-inventory")
+def deduct_order_inventory(
+    order_id: str,
+    current_user: dict = Depends(require_roles("ADMIN", "MANAGER", "WAITER", "CASHIER", "CHEF")),
+):
+    """
+    Explicitly triggers idempotent inventory deduction for an order.
+    """
+    try:
+        return OrderService.deduct_order_inventory(
+            order_id=order_id,
+            performed_by=current_user.get("name", "SYSTEM"),
+        )
+    except Exception as e:
+        handle_error(e)

@@ -62,6 +62,13 @@ async def lifespan(app: FastAPI):
             except Exception as se:
                 print(f"Menu seed warning: {se}")
 
+        try:
+            from app.database.seed_inventory_recipes import seed_inventory_and_recipes
+            seed_inventory_and_recipes()
+            print("Recipe-based inventory catalog verified")
+        except Exception as ie:
+            print(f"Inventory seed warning: {ie}")
+
     except Exception as e:
         print("========================================")
         print("MongoDB connection failed")

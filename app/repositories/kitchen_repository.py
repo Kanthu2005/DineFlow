@@ -11,7 +11,7 @@ from app.database.mongodb import (
     users_collection,
 )
 from app.repositories.base_repository import BaseRepository
-from app.services.common import to_object_id, serialize_document, serialize_documents, now_utc
+from app.utils.mongo_utils import to_object_id, serialize_document, serialize_documents, now_utc
 
 
 class KitchenRepository(BaseRepository):

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from app.database.mongodb import restaurant_tables_collection, reservations_collection
 from app.repositories.base_repository import BaseRepository
-from app.services.common import to_object_id, serialize_document, serialize_documents, now_utc
+from app.utils.mongo_utils import to_object_id, serialize_document, serialize_documents, now_utc
 
 
 class TableRepository(BaseRepository):

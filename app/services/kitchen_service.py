@@ -94,8 +94,10 @@ class KitchenService:
                 ticket["order_number"] = order.get("order_number")
                 ticket["order_type"] = order.get("order_type")
                 ticket["table_id"] = str(order.get("table_id")) if order.get("table_id") else None
+                ticket["table_number"] = order.get("table_number")
                 items = order_repo.find_order_items(order["id"])
                 ticket["items"] = items
+                ticket["order_items"] = items
 
         return ticket
 
@@ -110,8 +112,10 @@ class KitchenService:
                     t["order_number"] = order.get("order_number")
                     t["order_type"] = order.get("order_type")
                     t["table_id"] = str(order.get("table_id")) if order.get("table_id") else None
+                    t["table_number"] = order.get("table_number")
                     items = list(order_items_collection.find({"order_id": order["_id"]}))
-                    t["order_items"] = serialize_documents(items)
+                    t["items"] = serialize_documents(items)
+                    t["order_items"] = t["items"]
             enriched.append(t)
         return enriched
 
@@ -218,7 +222,8 @@ class KitchenService:
             "completed_at": now,
         })
 
-        order_repo.update(ticket["order_id"], {"status": "SERVED"})
+        from app.services.order_service import OrderService
+        OrderService.update_status(ticket["order_id"], "SERVED", performed_by="CHEF", role="CHEF")
 
         audit_repo.record_kitchen_event(
             order_id=ticket["order_id"],

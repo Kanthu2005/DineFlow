@@ -392,8 +392,8 @@ export default function BillingView({ targetInvoice }) {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'Outfit' }}>
-                            {ord.table_number ? `Table ${ord.table_number}` : 'Takeaway Counter'}
+                          <span style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'Outfit', color: 'var(--text-primary)' }}>
+                            {ord.table_number ? (ord.table_number.toString().toUpperCase().startsWith('T') ? ord.table_number : `T${ord.table_number}`) : 'Takeaway Counter'}
                           </span>
                         </div>
                         <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'Outfit' }}>
@@ -430,7 +430,7 @@ export default function BillingView({ targetInvoice }) {
                       CASHIER CHECKOUT STATION
                     </span>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'Outfit', marginTop: '2px' }}>
-                      {selectedOrder.table_number ? `Billing Table ${selectedOrder.table_number}` : 'Takeaway Order Billing'}
+                      {selectedOrder.table_number ? `Billing ${selectedOrder.table_number.toString().toUpperCase().startsWith('T') ? selectedOrder.table_number : `T${selectedOrder.table_number}`}` : 'Takeaway Order Billing'}
                     </h2>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                       Order #{selectedOrder.order_number || selectedOrder.id?.slice(-8)} &bull; Guest: {selectedOrder.customer_name || 'Dine-in Customer'}
@@ -448,12 +448,26 @@ export default function BillingView({ targetInvoice }) {
                     ORDERED DISHES & KITCHEN ITEMS
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {selectedOrder.items?.map((it, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                        <span>{it.quantity}x {it.name || it.menu_item_name || 'Dish Item'}</span>
-                        <span style={{ fontWeight: 600 }}>₹{(parseFloat(it.price || 0) * it.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 80px 90px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
+                      <span>FOOD ITEM</span>
+                      <span style={{ textAlign: 'center' }}>QTY</span>
+                      <span style={{ textAlign: 'right' }}>RATE</span>
+                      <span style={{ textAlign: 'right' }}>AMOUNT</span>
+                    </div>
+                    {selectedOrder.items?.map((it, idx) => {
+                      const name = it.name || it.item_name_snapshot || it.menu_item_name || 'Dish Item';
+                      const qty = it.quantity || 1;
+                      const rate = parseFloat(it.price || it.unit_price_snapshot || (it.item_total ? it.item_total / qty : 0));
+                      const total = parseFloat(it.item_total || rate * qty);
+                      return (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 80px 90px', fontSize: '0.85rem', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                          <span style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{qty}</span>
+                          <span style={{ textAlign: 'right', color: 'var(--text-muted)' }}>₹{rate.toFixed(2)}</span>
+                          <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>₹{total.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Calculations */}
@@ -844,6 +858,7 @@ export default function BillingView({ targetInvoice }) {
                     <div>
                       <div><strong>TAX INVOICE:</strong> #{selectedInvoice.invoice_number || selectedInvoice.id?.slice(-8)}</div>
                       <div><strong>ORDER:</strong> #{selectedInvoice.order_number || selectedInvoice.order_id?.slice(-8)}</div>
+                      <div><strong>TABLE:</strong> {selectedInvoice.table_number ? (selectedInvoice.table_number.toString().toUpperCase().startsWith('T') ? selectedInvoice.table_number : `T${selectedInvoice.table_number}`) : 'TAKEAWAY'}</div>
                       <div><strong>PAYMENT:</strong> {selectedInvoice.payment_method || 'CASH / UPI'}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -855,18 +870,28 @@ export default function BillingView({ targetInvoice }) {
 
                   {/* Items */}
                   <div style={{ borderTop: '1px dashed #94a3b8', borderBottom: '1px dashed #94a3b8', padding: '10px 0', margin: '10px 0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: '6px' }}>
-                      <span>ITEM</span>
-                      <span>TOTAL</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 65px 75px', fontWeight: 700, marginBottom: '6px', fontSize: '0.75rem', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px' }}>
+                      <span>FOOD ITEM</span>
+                      <span style={{ textAlign: 'center' }}>QTY</span>
+                      <span style={{ textAlign: 'right' }}>RATE</span>
+                      <span style={{ textAlign: 'right' }}>AMOUNT</span>
                     </div>
-                    {selectedInvoice.items?.map((it, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span>{it.quantity}x {it.name || it.menu_item_name || 'Dish Item'}</span>
-                        <span>₹{(parseFloat(it.price || 0) * it.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
+                    {selectedInvoice.items?.map((it, i) => {
+                      const name = it.name || it.item_name_snapshot || it.menu_item_name || 'Dish Item';
+                      const qty = it.quantity || 1;
+                      const rate = parseFloat(it.price || it.unit_price_snapshot || (it.item_total ? it.item_total / qty : 0));
+                      const total = parseFloat(it.item_total || rate * qty);
+                      return (
+                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 65px 75px', marginBottom: '4px', fontSize: '0.78rem' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                          <span style={{ textAlign: 'center' }}>{qty}</span>
+                          <span style={{ textAlign: 'right' }}>₹{rate.toFixed(2)}</span>
+                          <span style={{ textAlign: 'right', fontWeight: 700 }}>₹{total.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
                     {(!selectedInvoice.items || selectedInvoice.items.length === 0) && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
                         <span>Culinary Dining Experience</span>
                         <span>₹{parseFloat(selectedInvoice.subtotal || selectedInvoice.total_amount || 0).toFixed(2)}</span>
                       </div>
@@ -998,12 +1023,26 @@ export default function BillingView({ targetInvoice }) {
 
               {/* Items List */}
               <div style={{ borderTop: '1px dashed #94a3b8', borderBottom: '1px dashed #94a3b8', padding: '8px 0', margin: '8px 0' }}>
-                {generatedInvoice.items?.map((it, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{it.quantity}x {it.name || it.menu_item_name || 'Dish'}</span>
-                    <span>₹{(parseFloat(it.price || 0) * it.quantity).toFixed(2)}</span>
-                  </div>
-                ))}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 65px 75px', fontWeight: 700, marginBottom: '6px', fontSize: '0.75rem', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px' }}>
+                  <span>FOOD ITEM</span>
+                  <span style={{ textAlign: 'center' }}>QTY</span>
+                  <span style={{ textAlign: 'right' }}>RATE</span>
+                  <span style={{ textAlign: 'right' }}>AMOUNT</span>
+                </div>
+                {generatedInvoice.items?.map((it, i) => {
+                  const name = it.name || it.item_name_snapshot || it.menu_item_name || 'Dish';
+                  const qty = it.quantity || 1;
+                  const rate = parseFloat(it.price || it.unit_price_snapshot || (it.item_total ? it.item_total / qty : 0));
+                  const total = parseFloat(it.item_total || rate * qty);
+                  return (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 65px 75px', fontSize: '0.78rem', marginBottom: '3px' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                      <span style={{ textAlign: 'center' }}>{qty}</span>
+                      <span style={{ textAlign: 'right' }}>₹{rate.toFixed(2)}</span>
+                      <span style={{ textAlign: 'right', fontWeight: 700 }}>₹{total.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', borderTop: '1px solid #000', paddingTop: '6px' }}>

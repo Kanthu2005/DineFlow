@@ -55,8 +55,18 @@ class BillingService:
             status="UNPAID",
         )
 
+        table_number = order.get("table_number")
+        if not table_number and order.get("table_id"):
+            from app.database.mongodb import restaurant_tables_collection
+            tbl = restaurant_tables_collection.find_one({"_id": to_object_id(order["table_id"])})
+            if tbl:
+                table_number = tbl.get("table_number")
+
         doc = {
             "order_id": to_object_id(order_id),
+            "order_number": order.get("order_number"),
+            "table_number": table_number,
+            "customer_name": order.get("customer_name"),
             "invoice_number": entity.invoice_number,
             "subtotal": decimal128(entity.subtotal),
             "discount_amount": decimal128(entity.discount_amount),
@@ -73,6 +83,13 @@ class BillingService:
         invoice = billing_repo.find_by_id(invoice_id)
         if not invoice:
             raise ValueError("Invoice not found")
+        if invoice.get("order_id"):
+            ord_doc = order_repo.find_by_id(invoice["order_id"])
+            if ord_doc:
+                invoice["order_number"] = ord_doc.get("order_number")
+                invoice["table_number"] = ord_doc.get("table_number")
+                invoice["customer_name"] = ord_doc.get("customer_name")
+                invoice["items"] = order_repo.find_order_items(ord_doc["id"])
         return invoice
 
     @staticmethod
@@ -80,6 +97,13 @@ class BillingService:
         invoice = billing_repo.find_invoice_by_order(order_id)
         if not invoice:
             raise ValueError("Invoice not found for this order")
+        if invoice.get("order_id"):
+            ord_doc = order_repo.find_by_id(invoice["order_id"])
+            if ord_doc:
+                invoice["order_number"] = ord_doc.get("order_number")
+                invoice["table_number"] = ord_doc.get("table_number")
+                invoice["customer_name"] = ord_doc.get("customer_name")
+                invoice["items"] = order_repo.find_order_items(ord_doc["id"])
         return invoice
 
     @staticmethod
@@ -99,4 +123,7 @@ class BillingService:
                 if ord_doc:
                     inv["order_number"] = ord_doc.get("order_number")
                     inv["order_type"] = ord_doc.get("order_type")
+                    inv["table_number"] = ord_doc.get("table_number")
+                    inv["customer_name"] = ord_doc.get("customer_name")
+                    inv["items"] = order_repo.find_order_items(ord_doc["id"])
         return invoices

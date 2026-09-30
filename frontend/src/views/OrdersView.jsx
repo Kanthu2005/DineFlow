@@ -217,33 +217,67 @@ export default function OrdersView({ onNavigateToBilling }) {
                     </h4>
 
                     {/* Items table */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
-                      {order.items?.map((it, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            borderRadius: 'var(--radius-sm)',
-                            background: 'var(--bg-tertiary)',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          <div>
-                            <span style={{ fontWeight: 600 }}>{it.menu_item_name || it.name || `Item ${idx + 1}`}</span>
-                            <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>&times; {it.quantity}</span>
-                            {it.special_instructions && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '2px' }}>
-                                Note: {it.special_instructions}
-                              </div>
-                            )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                      {order.items?.map((it, idx) => {
+                        const name = it.name || it.item_name_snapshot || it.menu_item_name || `Item ${idx + 1}`;
+                        const qty = it.quantity || 1;
+                        const rate = parseFloat(it.price || it.unit_price_snapshot || it.unit_price || (it.item_total ? it.item_total / qty : 0));
+                        const total = parseFloat(it.item_total || rate * qty);
+
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '8px 12px',
+                              borderRadius: 'var(--radius-sm)',
+                              background: 'var(--bg-tertiary)',
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontWeight: 600 }}>{name}</span>
+                              <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
+                                &times; {qty} {rate > 0 ? `(@ ₹${rate.toFixed(2)})` : ''}
+                              </span>
+                              {it.special_instructions && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '2px' }}>
+                                  Note: {it.special_instructions}
+                                </div>
+                              )}
+                            </div>
+                            <span style={{ fontWeight: 700, fontFamily: 'Outfit' }}>
+                              ₹{total.toFixed(2)}
+                            </span>
                           </div>
-                          <span style={{ fontWeight: 700 }}>
-                            ₹{(parseFloat(it.price || it.unit_price || 0) * (it.quantity || 1)).toFixed(2)}
-                          </span>
+                        );
+                      })}
+                    </div>
+
+                    {/* Financial Summary breakdown */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                      <div style={{ minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                          <span>Subtotal:</span>
+                          <span>₹{parseFloat(order.subtotal || (parseFloat(order.total_amount || 0) / 1.05)).toFixed(2)}</span>
                         </div>
-                      ))}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                          <span>GST (5%):</span>
+                          <span>₹{parseFloat(order.tax_amount || (parseFloat(order.total_amount || 0) - parseFloat(order.subtotal || 0))).toFixed(2)}</span>
+                        </div>
+                        {parseFloat(order.discount_amount || 0) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981' }}>
+                            <span>Discount:</span>
+                            <span>-₹{parseFloat(order.discount_amount || 0).toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.9rem', color: 'var(--primary)', borderTop: '1px dashed var(--border-subtle)', paddingTop: '4px', marginTop: '2px', fontFamily: 'Outfit' }}>
+                          <span>Total Payable:</span>
+                          <span>₹{parseFloat(order.total_amount || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Status Advance Action Buttons */}

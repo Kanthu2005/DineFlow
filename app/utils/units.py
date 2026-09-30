@@ -41,6 +41,8 @@ def convert_quantity(quantity: Decimal | float | int | str, from_unit: str, to_u
         "L": Decimal("1000"),
         "LITER": Decimal("1000"),
         "LITERS": Decimal("1000"),
+        "LITRE": Decimal("1000"),
+        "LITRES": Decimal("1000"),
         "LTR": Decimal("1000"),
     }
 
@@ -48,5 +50,19 @@ def convert_quantity(quantity: Decimal | float | int | str, from_unit: str, to_u
         in_ml = qty * volume_to_ml[f_unit]
         return in_ml / volume_to_ml[t_unit]
 
-    # Direct fallback if identical or custom units (e.g. PCS, PACKET, PORTION)
+    # Discrete counts (PCS, PACKET)
+    count_units = {
+        "PIECE": "PIECE",
+        "PIECES": "PIECE",
+        "PCS": "PIECE",
+        "PC": "PIECE",
+        "PACKET": "PACKET",
+        "PACKETS": "PACKET",
+        "PKT": "PACKET",
+    }
+    if f_unit in count_units and t_unit in count_units:
+        if count_units[f_unit] == count_units[t_unit]:
+            return qty
+
+    # Direct fallback if identical or custom units
     return qty

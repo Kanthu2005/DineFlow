@@ -299,8 +299,8 @@ export default function DashboardView({ onNavigate }) {
                   onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
                   onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                 >
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    T-{t.table_number}
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'Outfit' }}>
+                    {t.table_number?.toString().toUpperCase().startsWith('T') ? t.table_number : `T${t.table_number}`}
                   </div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                     {t.capacity} Seats
