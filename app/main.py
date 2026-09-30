@@ -25,37 +25,42 @@ async def lifespan(app: FastAPI):
         print(f"Database: {settings.DATABASE_NAME}")
         print("========================================")
 
-        create_indexes(db)
+        is_vercel = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
+        has_admin = users_collection.find_one({"email": "admin@dineflow.com"}, {"_id": 1}) is not None
+        has_menu = db["menu_categories"].find_one({"name": "Biryani"}, {"_id": 1}) is not None
 
-        print("MongoDB indexes created successfully")
+        if not is_vercel or not has_admin:
+            create_indexes(db)
 
         # Auto-seed default roles if not already present
-        default_roles = [
-            ("admin@dineflow.com", "System Administrator", "ADMIN"),
-            ("manager@dineflow.com", "General Manager", "MANAGER"),
-            ("chef@dineflow.com", "Head Chef", "CHEF"),
-            ("waiter@dineflow.com", "Floor Waiter", "WAITER"),
-            ("cashier@dineflow.com", "Billing Cashier", "CASHIER"),
-        ]
-        for email, name, role in default_roles:
-            if not users_collection.find_one({"email": email.lower()}):
-                users_collection.insert_one({
-                    "name": name,
-                    "email": email.lower(),
-                    "password": hash_password("Password123!"),
-                    "role": role,
-                    "is_active": True,
-                    "created_at": now_utc(),
-                    "updated_at": now_utc(),
-                })
+        if not has_admin:
+            default_roles = [
+                ("admin@dineflow.com", "System Administrator", "ADMIN"),
+                ("manager@dineflow.com", "General Manager", "MANAGER"),
+                ("chef@dineflow.com", "Head Chef", "CHEF"),
+                ("waiter@dineflow.com", "Floor Waiter", "WAITER"),
+                ("cashier@dineflow.com", "Billing Cashier", "CASHIER"),
+            ]
+            for email, name, role in default_roles:
+                if not users_collection.find_one({"email": email.lower()}):
+                    users_collection.insert_one({
+                        "name": name,
+                        "email": email.lower(),
+                        "password": hash_password("Password123!"),
+                        "role": role,
+                        "is_active": True,
+                        "created_at": now_utc(),
+                        "updated_at": now_utc(),
+                    })
         print("Default staff role accounts verified")
 
-        try:
-            from seed_indian_menu import seed_indian_menu
-            seed_indian_menu()
-            print("Indian cuisine menu catalog verified")
-        except Exception as se:
-            print(f"Menu seed warning: {se}")
+        if not is_vercel or not has_menu:
+            try:
+                from seed_indian_menu import seed_indian_menu
+                seed_indian_menu()
+                print("Indian cuisine menu catalog verified")
+            except Exception as se:
+                print(f"Menu seed warning: {se}")
 
     except Exception as e:
         print("========================================")
@@ -65,13 +70,13 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
-    try:
-        client.close()
-        print("MongoDB connection closed")
-
-    except Exception as e:
-        print(f"Error closing MongoDB connection: {e}")
+    # Shutdown (keep client pool alive in serverless warm containers)
+    if not (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")):
+        try:
+            client.close()
+            print("MongoDB connection closed")
+        except Exception as e:
+            print(f"Error closing MongoDB connection: {e}")
 
 
 tags_metadata = [

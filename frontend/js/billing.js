@@ -335,12 +335,12 @@ const BillingView = (() => {
           select.innerHTML = `
             <option value="">-- Choose active or unbilled order --</option>
             ${eligible.map(o => {
-              const oId = o.id || o._id;
-              const oNum = o.order_number || `#${oId.slice(-6)}`;
-              const tNum = o.table_id?.table_number || o.table_id || "Takeaway";
-              const total = Number(o.total_amount?.$numberDecimal || o.total_amount || 0).toFixed(2);
-              return `<option value="${oId}">Order ${oNum} — Table #${tNum} (₹${total}) [${o.status}]</option>`;
-            }).join("")}
+            const oId = o.id || o._id;
+            const oNum = o.order_number || `#${oId.slice(-6)}`;
+            const tNum = o.table_id?.table_number || o.table_id || "Takeaway";
+            const total = Number(o.total_amount?.$numberDecimal || o.total_amount || 0).toFixed(2);
+            return `<option value="${oId}">Order ${oNum} — Table #${tNum} (₹${total}) [${o.status}]</option>`;
+          }).join("")}
           `;
           // Select first by default if exists
           if (eligible.length > 0) {

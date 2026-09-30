@@ -4,11 +4,14 @@
  */
 
 const API = (() => {
-  // Determine default base URL
-  const isSameOriginBackend = window.location.port === "8000" && window.location.pathname.startsWith("/app");
+  // Determine default base URL (supports Vercel/cloud deployment as well as local dev)
+  const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:";
+  const isSameOriginBackend = !isLocalHost || window.location.port === "8000";
   const defaultBaseUrl = isSameOriginBackend ? "/api" : "http://localhost:8000/api";
-  
-  let baseUrl = localStorage.getItem("dineflow_api_url") || defaultBaseUrl;
+
+  const savedBaseUrl = localStorage.getItem("dineflow_api_url");
+  const useSavedUrl = savedBaseUrl && (isLocalHost || (!savedBaseUrl.includes("localhost") && !savedBaseUrl.includes("127.0.0.1")));
+  let baseUrl = useSavedUrl ? savedBaseUrl : defaultBaseUrl;
 
   const getBaseUrl = () => baseUrl;
   const setBaseUrl = (url) => {
