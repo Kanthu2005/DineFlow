@@ -77,7 +77,7 @@ class OrderService:
             "status": "DRAFT",
             "subtotal": Decimal128("0"),
             "tax_amount": Decimal128("0"),
-            "discount_amount": Decimal128("0"),
+            "discount_amount": decimal128(Decimal(str(get_field(data, "discount_amount", 0) or 0))),
             "total_amount": Decimal128("0"),
             "inventory_deducted": False,
             "created_by": created_by,
@@ -604,16 +604,17 @@ class OrderItemService:
             p_dec = p.to_decimal() if isinstance(p, Decimal128) else Decimal(str(p))
             subtotal += p_dec * Decimal(it["quantity"])
 
-        # Documented 5% tax policy
-        tax = (subtotal * Decimal("0.05")).quantize(Decimal("0.01"))
-
         discount_raw = order.get("discount_amount", 0)
         discount = discount_raw.to_decimal() if isinstance(discount_raw, Decimal128) else Decimal(str(discount_raw))
+        discount = min(subtotal, max(Decimal("0"), discount))
 
-        total = max(Decimal("0"), (subtotal - discount + tax).quantize(Decimal("0.01")))
+        taxable = max(Decimal("0"), subtotal - discount)
+        tax = (taxable * Decimal("0.05")).quantize(Decimal("0.01"))
+        total = (taxable + tax).quantize(Decimal("0.01"))
 
         order_repo.update(order_id, {
             "subtotal": decimal128(subtotal),
+            "discount_amount": decimal128(discount),
             "tax_amount": decimal128(tax),
             "total_amount": decimal128(total),
         })

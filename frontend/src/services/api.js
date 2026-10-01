@@ -4,14 +4,21 @@
  */
 
 const getInitialBaseUrl = () => {
+  // 1. Explicit Vite environment variable (e.g. set in Vercel project environment variables)
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, "");
+  }
+
+  // 2. Saved manual override in browser localStorage
   const saved = localStorage.getItem("dineflow_api_url");
   if (saved) return saved.replace(/\/+$/, "");
 
+  const hostname = window.location.hostname;
   const isLocalHost = 
-    window.location.hostname === "localhost" || 
-    window.location.hostname === "127.0.0.1";
+    hostname === "localhost" || 
+    hostname === "127.0.0.1";
 
-  // If on local Vite dev server port 5173 or same origin on port 8000, use relative /api
+  // 3. Local development
   if (isLocalHost) {
     if (window.location.port === "5173" || window.location.port === "8000") {
       return "/api";
@@ -19,8 +26,13 @@ const getInitialBaseUrl = () => {
     return "http://localhost:8000/api";
   }
 
-  // Deployed (Vercel, Netlify, custom domain) -> relative /api is reverse-proxied or routed
-  return "/api";
+  // 4. Same-origin deployment (e.g. if served directly from Render backend at /app)
+  if (hostname.includes("onrender.com")) {
+    return "/api";
+  }
+
+  // 5. Deployed on Vercel, Netlify, or any production frontend host -> default to Render backend
+  return "https://dineflow-coo6.onrender.com/api";
 };
 
 let baseUrl = getInitialBaseUrl();
@@ -206,7 +218,7 @@ export const api = {
     complete: (orderId) => request(`/orders/${orderId}/complete`, { method: "POST" }),
     validateCart: (items) => request("/orders/validate-cart", { method: "POST", body: { items } }),
     updateStatus: (id, status) => request(`/orders/${id}/status`, { method: "PATCH", body: { status } }),
-    updateDiscount: (id, data) => request(`/orders/${id}/discount`, { method: "PATCH", body: data }),
+    updateDiscount: (id, data) => request(`/orders/${id}/discount`, { method: "PATCH", body: typeof data === "number" ? { discount_amount: data } : data }),
     addItem: (orderId, itemData) => request(`/orders/${orderId}/items`, { method: "POST", body: itemData }),
     getItems: (orderId) => request(`/orders/${orderId}/items`),
     recalculate: (orderId) => request(`/orders/${orderId}/recalculate`, { method: "POST" }),
@@ -230,7 +242,14 @@ export const api = {
       const q = status ? `?status=${encodeURIComponent(status)}` : "";
       return request(`/invoices${q}`);
     },
-    createInvoice: (orderId) => request("/invoices", { method: "POST", body: { order_id: orderId } }),
+    createInvoice: (orderId, discountAmount = null) => 
+      request("/invoices", { 
+        method: "POST", 
+        body: { 
+          order_id: orderId, 
+          ...(discountAmount !== null && discountAmount !== undefined ? { discount_amount: Number(discountAmount) } : {}) 
+        } 
+      }),
     getInvoice: (id) => request(`/invoices/${id}`),
     getInvoiceByOrder: (orderId) => request(`/invoices/order/${orderId}`),
     createPayment: (data) => request("/payments", { method: "POST", body: data }),
@@ -257,6 +276,15 @@ export const api = {
     getAll: () => request("/feedback"),
     getSummary: () => request("/feedback/summary"),
     create: (orderId, data) => request(`/orders/${orderId}/feedback`, { method: "POST", body: data }),
+  },
+
+  // Users & Staff
+  users: {
+    getAll: () => request("/users"),
+    getById: (id) => request(`/users/${id}`),
+    create: (data) => request("/users", { method: "POST", body: data }),
+    update: (id, data) => request(`/users/${id}`, { method: "PUT", body: data }),
+    delete: (id) => request(`/users/${id}`, { method: "DELETE" }),
   },
 
   // Reports

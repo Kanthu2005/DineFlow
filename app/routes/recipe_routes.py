@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.schemas.recipe_schema import RecipeCreate, RecipeUpdate
 from app.services.recipe_service import RecipeService
-from app.routes.dependencies import handle_error, get_current_user, require_roles
+from app.routes.dependencies import handle_error, get_current_user, get_optional_current_user, require_roles
 
 router = APIRouter(tags=["Recipes & Stock Availability"])
 
@@ -20,7 +20,7 @@ router = APIRouter(tags=["Recipes & Stock Availability"])
 @router.get("/menu/items/availability", include_in_schema=False)
 @router.get("/menu/availability", include_in_schema=False)
 def get_all_menu_items_availability(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict | None = Depends(get_optional_current_user),
 ):
     """
     Returns real-time stock availability state for all menu items:
@@ -39,7 +39,7 @@ def get_all_menu_items_availability(
 def get_menu_item_availability(
     menu_item_id: str,
     quantity: int = Query(default=1, ge=1, description="Quantity requested to evaluate"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict | None = Depends(get_optional_current_user),
 ):
     """
     Evaluates item recipe against warehouse stock.

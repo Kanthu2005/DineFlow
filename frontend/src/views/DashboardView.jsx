@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { 
   TrendingUp, ShoppingBag, Grid, ChefHat, AlertTriangle, 
-  ArrowUpRight, Clock, Plus, RefreshCw, CheckCircle2, ChevronRight
+  ArrowUpRight, Clock, Plus, RefreshCw, CheckCircle2, ChevronRight, UtensilsCrossed
 } from 'lucide-react';
 
 export default function DashboardView({ onNavigate }) {
@@ -86,9 +86,9 @@ export default function DashboardView({ onNavigate }) {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
-          <button onClick={() => onNavigate('pos')} className="btn btn-primary">
-            <Plus size={16} />
-            <span>Create New Order (POS)</span>
+          <button onClick={() => onNavigate('menu')} className="btn btn-primary">
+            <UtensilsCrossed size={16} />
+            <span>Manage Menu</span>
           </button>
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function DashboardView({ onNavigate }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {recentOrders.length === 0 ? (
               <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                No active orders recorded today. Use the POS to create an order.
+                No active orders recorded today.
               </div>
             ) : (
               recentOrders.map((ord) => (

@@ -34,7 +34,8 @@ def create_invoice(
         oid = order_id or (data.order_id if data else None)
         if not oid:
             raise ValueError("order_id is required to create invoice")
-        return BillingService.create_invoice(oid)
+        discount_amt = data.discount_amount if data else None
+        return BillingService.create_invoice(oid, discount_amount=discount_amt)
     except Exception as e:
         handle_error(e)
 

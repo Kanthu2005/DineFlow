@@ -76,9 +76,12 @@ class PaymentService:
 
         # Business Rule: Payment cannot exceed outstanding amount
         if amount > outstanding:
-            raise ValueError(
-                f"Payment amount ({amount}) exceeds outstanding amount ({outstanding})"
-            )
+            if (amount - outstanding) <= Decimal("0.05"):
+                amount = outstanding
+            else:
+                raise ValueError(
+                    f"Payment amount ({amount}) exceeds outstanding amount ({outstanding})"
+                )
 
         # Business Rule: Duplicate transaction references should be rejected
         if ref:

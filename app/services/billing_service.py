@@ -29,19 +29,75 @@ order_repo = OrderRepository()
 class BillingService:
 
     @staticmethod
-    def create_invoice(order_id: str) -> Dict[str, Any]:
+    def _format_items(items_raw: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        formatted = []
+        for it in (items_raw or []):
+            p = it.get("unit_price_snapshot")
+            p_val = float(p.to_decimal() if isinstance(p, Decimal128) else Decimal(str(p or 0)))
+            t = it.get("item_total")
+            t_val = float(t.to_decimal() if isinstance(t, Decimal128) else Decimal(str(t or 0)))
+            formatted.append({
+                "id": str(it.get("id") or it.get("_id", "")),
+                "name": it.get("item_name_snapshot") or it.get("name") or "Dish Item",
+                "price": p_val,
+                "quantity": int(it.get("quantity", 1)),
+                "item_total": t_val,
+                "special_instructions": it.get("special_instructions") or "",
+            })
+        return formatted
+
+    @staticmethod
+    def create_invoice(order_id: str, discount_amount: Optional[Decimal] = None) -> Dict[str, Any]:
         order = order_repo.find_by_id(order_id)
         if not order:
             raise ValueError("Order not found")
 
-        existing = billing_repo.find_invoice_by_order(order_id)
-        if existing:
-            return existing
+        # If discount_amount is explicitly provided, update the order discount first
+        if discount_amount is not None:
+            from app.services.order_service import OrderService
+            OrderService.update_discount(order_id, discount_amount)
+            order = order_repo.find_by_id(order_id)
+        else:
+            from app.services.order_service import OrderItemService
+            OrderItemService.recalculate_order(order_id)
+            order = order_repo.find_by_id(order_id)
 
         subtotal_dec = order["subtotal"].to_decimal() if isinstance(order["subtotal"], Decimal128) else Decimal(str(order["subtotal"]))
         discount_dec = order["discount_amount"].to_decimal() if isinstance(order["discount_amount"], Decimal128) else Decimal(str(order["discount_amount"]))
         tax_dec = order["tax_amount"].to_decimal() if isinstance(order["tax_amount"], Decimal128) else Decimal(str(order["tax_amount"]))
         total_dec = order["total_amount"].to_decimal() if isinstance(order["total_amount"], Decimal128) else Decimal(str(order["total_amount"]))
+
+        table_number = order.get("table_number")
+        if not table_number and order.get("table_id"):
+            from app.database.mongodb import restaurant_tables_collection
+            tbl = restaurant_tables_collection.find_one({"_id": to_object_id(order["table_id"])})
+            if tbl:
+                table_number = tbl.get("table_number")
+
+        items_raw = order_repo.find_order_items(order_id)
+        formatted_items = BillingService._format_items(items_raw)
+
+        existing = billing_repo.find_invoice_by_order(order_id)
+        if existing:
+            if existing.get("status") == "UNPAID":
+                billing_repo.update(existing["id"], {
+                    "subtotal": decimal128(subtotal_dec),
+                    "discount_amount": decimal128(discount_dec),
+                    "tax_amount": decimal128(tax_dec),
+                    "total_amount": decimal128(total_dec),
+                    "table_number": table_number,
+                    "order_number": order.get("order_number"),
+                    "customer_name": order.get("customer_name"),
+                })
+                existing["subtotal"] = subtotal_dec
+                existing["discount_amount"] = discount_dec
+                existing["tax_amount"] = tax_dec
+                existing["total_amount"] = total_dec
+            existing["items"] = formatted_items
+            existing["order_number"] = order.get("order_number")
+            existing["table_number"] = table_number
+            existing["customer_name"] = order.get("customer_name")
+            return existing
 
         invoice_number = generate_number("INV")
 
@@ -54,13 +110,6 @@ class BillingService:
             total_amount=total_dec,
             status="UNPAID",
         )
-
-        table_number = order.get("table_number")
-        if not table_number and order.get("table_id"):
-            from app.database.mongodb import restaurant_tables_collection
-            tbl = restaurant_tables_collection.find_one({"_id": to_object_id(order["table_id"])})
-            if tbl:
-                table_number = tbl.get("table_number")
 
         doc = {
             "order_id": to_object_id(order_id),
@@ -76,7 +125,9 @@ class BillingService:
             "generated_at": now_utc(),
         }
 
-        return billing_repo.insert(doc)
+        created = billing_repo.insert(doc)
+        created["items"] = formatted_items
+        return created
 
     @staticmethod
     def get_invoice(invoice_id: str) -> Dict[str, Any]:
@@ -89,7 +140,8 @@ class BillingService:
                 invoice["order_number"] = ord_doc.get("order_number")
                 invoice["table_number"] = ord_doc.get("table_number")
                 invoice["customer_name"] = ord_doc.get("customer_name")
-                invoice["items"] = order_repo.find_order_items(ord_doc["id"])
+                raw_items = order_repo.find_order_items(ord_doc["id"])
+                invoice["items"] = BillingService._format_items(raw_items)
         return invoice
 
     @staticmethod
@@ -103,7 +155,8 @@ class BillingService:
                 invoice["order_number"] = ord_doc.get("order_number")
                 invoice["table_number"] = ord_doc.get("table_number")
                 invoice["customer_name"] = ord_doc.get("customer_name")
-                invoice["items"] = order_repo.find_order_items(ord_doc["id"])
+                raw_items = order_repo.find_order_items(ord_doc["id"])
+                invoice["items"] = BillingService._format_items(raw_items)
         return invoice
 
     @staticmethod
@@ -125,5 +178,6 @@ class BillingService:
                     inv["order_type"] = ord_doc.get("order_type")
                     inv["table_number"] = ord_doc.get("table_number")
                     inv["customer_name"] = ord_doc.get("customer_name")
-                    inv["items"] = order_repo.find_order_items(ord_doc["id"])
+                    raw_items = order_repo.find_order_items(ord_doc["id"])
+                    inv["items"] = BillingService._format_items(raw_items)
         return invoices

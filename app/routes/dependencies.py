@@ -37,6 +37,15 @@ def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(
         )
 
 
+def get_optional_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> dict | None:
+    if not credentials:
+        return None
+    try:
+        return AuthService.get_current_user_from_token(credentials.credentials)
+    except Exception:
+        return None
+
+
 def require_roles(*allowed_roles: str):
     role_set = {r.upper() for r in allowed_roles}
     role_set.add("ADMIN")  # Superuser ADMIN always authorized

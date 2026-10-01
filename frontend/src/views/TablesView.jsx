@@ -16,7 +16,7 @@ const ZONES = [
   { id: 'FAMILY_SECTION', label: 'Family Dining Section' },
 ];
 
-export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
+export default function TablesView({ onNavigateToBilling }) {
   const { role, permissions } = useAuth();
   const { showToast } = useToast();
 
@@ -496,12 +496,12 @@ export default function TablesView({ onNavigateToPOS, onNavigateToBilling }) {
                       {/* Primary Workflow Button */}
                       {isAvailable && (
                         <button
-                          onClick={() => onNavigateToPOS ? onNavigateToPOS(table.id) : null}
+                          onClick={() => handleUpdateStatus(table.id, 'OCCUPIED')}
                           className="btn btn-primary btn-sm"
                           style={{ width: '100%', justifyContent: 'center', padding: '8px' }}
                         >
-                          <ShoppingBag size={14} />
-                          <span>Seat & Order (POS)</span>
+                          <CheckCircle2 size={14} />
+                          <span>Seat Guests</span>
                         </button>
                       )}
 

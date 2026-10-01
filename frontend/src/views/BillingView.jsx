@@ -9,7 +9,7 @@ import {
   ShoppingBag, Check, Volume2, User, Clock, ArrowRight, Share2
 } from 'lucide-react';
 
-export default function BillingView({ targetInvoice }) {
+export default function BillingView({ targetInvoice, onNavigate }) {
   const { role, permissions } = useAuth();
   const { showToast } = useToast();
 
@@ -69,9 +69,7 @@ export default function BillingView({ targetInvoice }) {
         // Find first unbilled order to preselect
         const unbilled = allOrders.filter(o => o.status !== 'CANCELLED' && o.status !== 'COMPLETED');
         if (unbilled.length > 0 && !selectedOrder) {
-          setSelectedOrder(unbilled[0]);
-          const total = parseFloat(unbilled[0].total_amount || 0);
-          setCashTendered(total.toString());
+          handleSelectOrder(unbilled[0]);
         }
       }
     } catch (err) {
@@ -96,8 +94,14 @@ export default function BillingView({ targetInvoice }) {
   // Select order to bill
   const handleSelectOrder = (order) => {
     setSelectedOrder(order);
-    const total = parseFloat(order.total_amount || 0);
-    setCashTendered(total.toString());
+    const existingDiscount = parseFloat(order.discount_amount || 0);
+    setCustomDiscount(existingDiscount);
+    setDiscountPercent(0);
+    const sub = parseFloat(order.subtotal || 0);
+    const disc = Math.min(sub, existingDiscount);
+    const taxable = Math.max(0, sub - disc);
+    const total = taxable + taxable * 0.05;
+    setCashTendered(total.toFixed(2));
     setPayRef(`${payMethod}-${Date.now().toString().slice(-6)}`);
   };
 
@@ -120,10 +124,10 @@ export default function BillingView({ targetInvoice }) {
     try {
       const orderId = selectedOrder.id;
 
-      // 1. Create the Tax Invoice for this order
-      const invoiceDoc = await api.billing.createInvoice(orderId);
+      // 1. Create or update the Tax Invoice for this order with calculated discount
+      const invoiceDoc = await api.billing.createInvoice(orderId, discountVal);
       const invoiceId = invoiceDoc.id || invoiceDoc._id;
-      const totalAmt = parseFloat(invoiceDoc.total_amount || selectedOrder.total_amount || 0);
+      const totalAmt = parseFloat(invoiceDoc.total_amount || netPayable || 0);
 
       // 2. Process and record the payment immediately
       await api.billing.createPayment({
@@ -140,7 +144,7 @@ export default function BillingView({ targetInvoice }) {
         status: 'PAID',
         payment_method: payMethod,
         transaction_reference: payRef,
-        items: selectedOrder.items || [],
+        items: (invoiceDoc.items && invoiceDoc.items.length > 0) ? invoiceDoc.items : (selectedOrder.items || []),
         order_number: selectedOrder.order_number,
         table_number: selectedOrder.table_number,
         customer_name: selectedOrder.customer_name || 'Guest Diner',
@@ -178,7 +182,7 @@ export default function BillingView({ targetInvoice }) {
 
   // Active bill calculations
   const orderSubtotal = selectedOrder ? parseFloat(selectedOrder.subtotal || 0) : 0;
-  const discountVal = selectedOrder ? (orderSubtotal * (discountPercent / 100)) + parseFloat(customDiscount || 0) : 0;
+  const discountVal = selectedOrder ? Math.min(orderSubtotal, (orderSubtotal * (discountPercent / 100)) + (parseFloat(customDiscount) || 0)) : 0;
   const taxableAmount = Math.max(0, orderSubtotal - discountVal);
   const cgst = taxableAmount * 0.025;
   const sgst = taxableAmount * 0.025;
@@ -233,6 +237,12 @@ export default function BillingView({ targetInvoice }) {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          {onNavigate && (
+            <button onClick={() => onNavigate('orders')} className="btn btn-primary">
+              <Clock size={14} />
+              <span>Live Orders</span>
+            </button>
+          )}
           <button onClick={loadData} className="btn btn-secondary">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             <span>Sync Registers</span>
@@ -365,10 +375,20 @@ export default function BillingView({ targetInvoice }) {
               ) : filteredActiveOrders.length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <CheckCircle2 size={32} style={{ margin: '0 auto 10px', color: '#10b981', opacity: 0.8 }} />
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>All Tables Settled!</div>
-                  <p style={{ fontSize: '0.78rem', marginTop: '4px' }}>
-                    No unbilled orders waiting. New orders taken from POS or Tables will appear here for checkout.
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>All Orders Settled!</div>
+                  <p style={{ fontSize: '0.78rem', marginTop: '4px', marginBottom: '14px' }}>
+                    No unbilled orders waiting. All customer orders are settled.
                   </p>
+                  {onNavigate && (
+                    <button
+                      onClick={() => onNavigate('orders')}
+                      className="btn btn-primary btn-sm"
+                      style={{ margin: '0 auto', display: 'inline-flex' }}
+                    >
+                      <Clock size={14} />
+                      <span>View Live Orders</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredActiveOrders.map(ord => {
@@ -477,30 +497,55 @@ export default function BillingView({ targetInvoice }) {
                       <span>₹{orderSubtotal.toFixed(2)}</span>
                     </div>
 
-                    {/* Quick Discount Selector */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                    {/* Quick Discount Selector & Custom Discount */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0', flexWrap: 'wrap', gap: '6px' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Discount Voucher:</span>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {[0, 5, 10, 15].map(pct => (
-                          <button
-                            key={pct}
-                            type="button"
-                            onClick={() => setDiscountPercent(pct)}
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              border: '1px solid',
-                              borderColor: discountPercent === pct ? 'var(--primary)' : 'var(--border-subtle)',
-                              background: discountPercent === pct ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-                              color: discountPercent === pct ? '#818cf8' : 'var(--text-muted)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {pct === 0 ? 'None' : `${pct}%`}
-                          </button>
-                        ))}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[0, 5, 10, 15].map(pct => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => {
+                                setDiscountPercent(pct);
+                                if (pct > 0) setCustomDiscount(0);
+                              }}
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                border: '1px solid',
+                                borderColor: discountPercent === pct ? 'var(--primary)' : 'var(--border-subtle)',
+                                background: discountPercent === pct ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                                color: discountPercent === pct ? '#818cf8' : 'var(--text-muted)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {pct === 0 ? 'None' : `${pct}%`}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="number"
+                          placeholder="₹ Flat"
+                          value={customDiscount || ''}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setCustomDiscount(val);
+                            if (val > 0) setDiscountPercent(0);
+                          }}
+                          style={{
+                            width: '68px',
+                            height: '24px',
+                            fontSize: '0.72rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-subtle)',
+                            color: 'var(--text-primary)',
+                          }}
+                        />
                       </div>
                     </div>
 
@@ -831,6 +876,7 @@ export default function BillingView({ targetInvoice }) {
 
                 {/* Thermal Tax Receipt */}
                 <div
+                  className="printable-receipt"
                   style={{
                     background: '#ffffff',
                     color: '#0f172a',
@@ -997,6 +1043,7 @@ export default function BillingView({ targetInvoice }) {
 
             {/* Thermal Tax Receipt View */}
             <div
+              className="printable-receipt"
               style={{
                 background: '#ffffff',
                 color: '#0f172a',

@@ -162,10 +162,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for frontend UI connecting from any origin/port
+# Enable CORS for frontend UI connecting from any origin/port (Vercel, Render, Localhost)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[],
+    allow_origin_regex=r".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

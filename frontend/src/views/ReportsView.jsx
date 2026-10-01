@@ -95,12 +95,12 @@ export default function ReportsView() {
         </div>
 
         <div className="stat-card">
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>CATALOG MENU DISHES</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>MENU DISHES</div>
           <div style={{ fontSize: '1.85rem', fontWeight: 800, fontFamily: 'Outfit', marginTop: '6px' }}>
             {items.length}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Active culinary catalog items
+            Active menu dishes
           </div>
         </div>
       </div>

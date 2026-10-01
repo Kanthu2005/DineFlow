@@ -5,7 +5,8 @@ import { useToast } from '../context/ToastContext';
 import { 
   UtensilsCrossed, Plus, Search, Edit2, Trash2, Check, 
   X, RefreshCw, Clock, Leaf, AlertCircle, Eye, EyeOff,
-  ChefHat, Sparkles, Filter, Lock, CheckCircle2, Flame
+  ChefHat, Sparkles, Filter, Lock, CheckCircle2, Flame,
+  ShoppingCart, Minus, ArrowRight
 } from 'lucide-react';
 
 const PRESET_DISH_IMAGES = [
@@ -17,11 +18,22 @@ const PRESET_DISH_IMAGES = [
   { label: 'Gulab Jamun', url: 'https://images.unsplash.com/photo-1605197586548-932f146a782b?w=600' },
 ];
 
-export default function MenuView() {
+export default function MenuView({ onNavigate, initialTab = 'browse' }) {
   const { role, permissions } = useAuth();
   const { showToast } = useToast();
 
-  const canManageMenu = permissions?.canEditMenu ?? (role === 'ADMIN' || role === 'MANAGER' || role === 'CHEF');
+  const canManageMenu = true;
+
+  const [subTab, setSubTab] = useState(initialTab || 'browse');
+
+  useEffect(() => {
+    if (initialTab) {
+      setSubTab(initialTab);
+      if (initialTab === 'add') {
+        openAddModal();
+      }
+    }
+  }, [initialTab]);
 
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -62,21 +74,51 @@ export default function MenuView() {
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [availabilityMap, setAvailabilityMap] = useState({});
 
+  // Cart & Ordering State
+  const [cart, setCart] = useState(() => {
+    try {
+      const s = localStorage.getItem('dineflow_menu_cart');
+      return s ? JSON.parse(s) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [tablesList, setTablesList] = useState([]);
+  const [selectedTable, setSelectedTable] = useState('');
+  const [orderType, setOrderType] = useState('DINE_IN');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [showCartDrawer, setShowCartDrawer] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('dineflow_menu_cart', JSON.stringify(cart));
+    } catch (e) {
+      console.warn('Could not persist cart:', e);
+    }
+  }, [cart]);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [itRes, catRes, availRes] = await Promise.all([
+      const [itRes, catRes, availRes, tblRes] = await Promise.all([
         api.menu.getItems(),
         api.menu.getCategories(),
         api.menu.getAvailability().catch(() => ({})),
+        api.tables.getAll().catch(() => []),
       ]);
       setItems(Array.isArray(itRes) ? itRes : []);
       setCategories(Array.isArray(catRes) ? catRes : []);
       const availObj = availRes?.items || availRes || {};
       setAvailabilityMap(typeof availObj === 'object' ? availObj : {});
+      if (Array.isArray(tblRes) && tblRes.length > 0) {
+        setTablesList(tblRes);
+        setSelectedTable(prev => prev || tblRes[0].id);
+      }
     } catch (err) {
       console.error('Menu load error:', err);
-      showToast('Could not load menu catalog', 'error');
+      showToast('Could not load menu', 'error');
     } finally {
       setLoading(false);
     }
@@ -86,11 +128,103 @@ export default function MenuView() {
     loadData();
   }, []);
 
-  const openAddModal = () => {
-    if (!canManageMenu) {
-      showToast('Only Chef, Manager, or Admin can add dishes', 'warning');
+  const handleAddToCart = (item) => {
+    const avail = availabilityMap[item.id] || {};
+    if (avail.status === 'OUT_OF_STOCK' || item.is_available === false) {
+      showToast(`${item.name} is currently sold out`, 'warning');
       return;
     }
+    const existing = cart.find(c => c.item.id === item.id);
+    const nextQty = (existing?.quantity || 0) + 1;
+    if (avail.has_recipe && avail.max_portions != null && nextQty > avail.max_portions) {
+      showToast(`Cannot add more. Only ${avail.max_portions} portions available for ${item.name}`, 'warning');
+      return;
+    }
+
+    setCart(prev => {
+      const exists = prev.find(c => c.item.id === item.id);
+      if (exists) {
+        return prev.map(c => c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+      }
+      return [...prev, { item, quantity: 1, instructions: '' }];
+    });
+    showToast(`Added ${item.name} to Cart`, 'success', 1500);
+  };
+
+  const handleUpdateCartQty = (itemId, delta) => {
+    setCart(prev =>
+      prev
+        .map(c => {
+          if (c.item.id === itemId) {
+            const newQty = c.quantity + delta;
+            return newQty > 0 ? { ...c, quantity: newQty } : null;
+          }
+          return c;
+        })
+        .filter(Boolean)
+    );
+  };
+
+  const handleUpdateCartInstructions = (itemId, instructions) => {
+    setCart(prev => prev.map(c => c.item.id === itemId ? { ...c, instructions } : c));
+  };
+
+  const handleClearCart = () => {
+    setCart([]);
+    showToast('Cart cleared', 'info');
+  };
+
+  const cartCount = cart.reduce((sum, c) => sum + c.quantity, 0);
+  const cartSubtotal = cart.reduce((sum, c) => sum + (parseFloat(c.item.price || 0) * c.quantity), 0);
+  const cartTax = cartSubtotal * 0.05;
+  const cartTotal = cartSubtotal + cartTax;
+
+  const handlePlaceOrder = async () => {
+    if (cart.length === 0) {
+      showToast('Your cart is empty. Add dishes first.', 'warning');
+      return;
+    }
+    if (orderType === 'DINE_IN' && !selectedTable && tablesList.length > 0) {
+      showToast('Please select a dining table for Dine-In orders.', 'warning');
+      return;
+    }
+
+    setPlacingOrder(true);
+    try {
+      const orderPayload = {
+        customer_name: customerName.trim() || 'Walk-in Guest',
+        customer_phone: customerPhone.trim() || '9876543210',
+        table_id: orderType === 'DINE_IN' ? selectedTable : null,
+        order_type: orderType,
+        items: cart.map(c => ({
+          menu_item_id: c.item.id,
+          quantity: c.quantity,
+          special_instructions: c.instructions || '',
+        })),
+      };
+
+      const newOrder = await api.orders.create(orderPayload);
+      try {
+        await api.orders.confirm(newOrder.id);
+      } catch (confirmErr) {
+        console.warn('Order confirmation warning:', confirmErr);
+      }
+
+      setCart([]);
+      localStorage.removeItem('dineflow_menu_cart');
+      setShowCartDrawer(false);
+      showToast(`Order #${newOrder.order_number || newOrder.id} placed & sent to kitchen!`, 'success', 4500);
+
+      api.menu.getAvailability().then(res => setAvailabilityMap(res || {})).catch(() => {});
+    } catch (err) {
+      console.error('Order creation error:', err);
+      showToast(err.message || 'Failed to place order', 'danger');
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
+
+  const openAddModal = () => {
     setEditingItem(null);
     setName('');
     setDescription('');
@@ -148,6 +282,8 @@ export default function MenuView() {
         showToast(`Dish "${name}" added to menu!`, 'success');
       }
       setShowModal(false);
+      setSubTab('browse');
+      if (onNavigate) onNavigate('menu');
     } catch (err) {
       showToast(err.message || 'Failed to save menu item', 'danger');
     } finally {
@@ -171,7 +307,7 @@ export default function MenuView() {
     try {
       await api.menu.deleteItem(itemToDelete.id);
       setItems(prev => prev.filter(it => it.id !== itemToDelete.id));
-      showToast(`Removed "${itemToDelete.name}" from catalog`, 'success');
+      showToast(`Removed "${itemToDelete.name}" from menu`, 'success');
       setItemToDelete(null);
     } catch (err) {
       showToast(err.message || 'Failed to delete dish', 'danger');
@@ -193,6 +329,30 @@ export default function MenuView() {
       setNewCatDesc('');
     } catch (err) {
       showToast(err.message || 'Failed to create category', 'danger');
+    }
+  };
+
+  const handleSelectOrAddPresetCat = async (catName, forceVeg = null) => {
+    let matched = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+    if (!matched) {
+      try {
+        const res = await api.menu.createCategory({
+          name: catName,
+          description: `${catName} items for dining menu`,
+        });
+        setCategories(prev => [...prev, res]);
+        matched = res;
+        showToast(`Category "${catName}" added to menu!`, 'success');
+      } catch (err) {
+        showToast(err.message || `Failed to create ${catName}`, 'danger');
+        return;
+      }
+    }
+    if (matched) {
+      setCategoryId(matched.id);
+      if (forceVeg !== null) {
+        setIsVeg(forceVeg);
+      }
     }
   };
 
@@ -267,9 +427,41 @@ export default function MenuView() {
     }
   };
 
+  // Helper to identify if an item is a starter
+  const isItemStarter = (it) => {
+    const cat = categories.find(c => c.id === it.category_id);
+    const catName = (cat?.name || '').toLowerCase();
+    const itName = (it.name || '').toLowerCase();
+    const itDesc = (it.description || '').toLowerCase();
+    return (
+      catName.includes('starter') ||
+      itName.includes('starter') ||
+      itDesc.includes('starter') ||
+      itName.includes('tikka') ||
+      itName.includes('kebab') ||
+      catName.includes('appetizer')
+    );
+  };
+
   // Filter items
   const filteredItems = items.filter(it => {
-    const matchesCat = selectedCat === 'ALL' || it.category_id === selectedCat;
+    let matchesCat = true;
+    if (selectedCat === 'ALL') {
+      matchesCat = true;
+    } else if (selectedCat === 'VEG') {
+      matchesCat = !!it.is_vegetarian;
+    } else if (selectedCat === 'NON_VEG') {
+      matchesCat = !it.is_vegetarian;
+    } else if (selectedCat === 'STARTERS') {
+      matchesCat = isItemStarter(it);
+    } else if (selectedCat === 'VEG_STARTERS') {
+      matchesCat = isItemStarter(it) && !!it.is_vegetarian;
+    } else if (selectedCat === 'NON_VEG_STARTERS') {
+      matchesCat = isItemStarter(it) && !it.is_vegetarian;
+    } else {
+      matchesCat = it.category_id === selectedCat;
+    }
+
     const matchesSearch = 
       it.name.toLowerCase().includes(search.toLowerCase()) ||
       (it.description && it.description.toLowerCase().includes(search.toLowerCase()));
@@ -289,7 +481,7 @@ export default function MenuView() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'Outfit' }}>Menu & Culinary Catalog</h1>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'Outfit' }}>Menu</h1>
             <span
               style={{
                 fontSize: '0.7rem',
@@ -305,68 +497,162 @@ export default function MenuView() {
             </span>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
-            Authentic Indian dietary categorization, live kitchen availability status, recipes, and price control.
+            Manage dishes, categories, recipe ingredients, and pricing for your restaurant menu.
           </p>
         </div>
 
-        {/* Actions based on role */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {canManageMenu ? (
-            <>
-              <button onClick={() => setShowCatModal(true)} className="btn btn-secondary">
-                <Plus size={15} />
-                <span>Add Category</span>
-              </button>
-              <button onClick={openAddModal} className="btn btn-primary">
-                <Plus size={16} />
-                <span>Add New Dish</span>
-              </button>
-            </>
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 14px',
-                borderRadius: 'var(--radius-md)',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid var(--border-subtle)',
-                fontSize: '0.78rem',
-                color: 'var(--text-muted)',
-              }}
-            >
-              <Lock size={14} style={{ color: 'var(--warning)' }} />
-              <span>{role} Station (View & Stock Toggle Only)</span>
-            </div>
-          )}
+        {/* Action buttons: Menu Navigation Tabs & Add Menu */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setSubTab('browse')}
+            className={`btn ${subTab === 'browse' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ borderRadius: 'var(--radius-full)', padding: '8px 16px', fontWeight: 600 }}
+          >
+            <UtensilsCrossed size={15} />
+            <span>Menu Items</span>
+          </button>
+          <button
+            onClick={() => {
+              openAddModal();
+              setSubTab('add');
+            }}
+            className={`btn ${subTab === 'add' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ borderRadius: 'var(--radius-full)', padding: '8px 18px', fontWeight: 700, boxShadow: 'var(--shadow-glow)' }}
+          >
+            <Plus size={16} />
+            <span>Add Menu</span>
+          </button>
+          <button
+            onClick={() => setShowCatModal(true)}
+            className="btn btn-secondary"
+            style={{ borderRadius: 'var(--radius-full)', padding: '8px 16px' }}
+          >
+            <Plus size={15} />
+            <span>Add Category</span>
+          </button>
+          <button
+            onClick={() => setShowCartDrawer(true)}
+            className="btn btn-primary"
+            style={{
+              borderRadius: 'var(--radius-full)',
+              padding: '8px 18px',
+              fontWeight: 700,
+              gap: '8px',
+              background: cart.length > 0 ? 'var(--primary-gradient)' : 'rgba(255, 255, 255, 0.08)',
+              border: cart.length > 0 ? 'none' : '1px solid var(--border-subtle)',
+              color: cart.length > 0 ? '#fff' : 'var(--text-primary)',
+              boxShadow: cart.length > 0 ? 'var(--shadow-glow)' : 'none',
+            }}
+          >
+            <ShoppingCart size={16} />
+            <span>Cart ({cartCount})</span>
+            {cartCount > 0 && (
+              <span style={{ fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.25)', padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>
+                ₹{cartTotal.toFixed(2)}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {/* Categories Bar */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center' }}>
           <button
             onClick={() => setSelectedCat('ALL')}
             className={`btn btn-sm ${selectedCat === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap' }}
+            style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', fontWeight: 700 }}
           >
-            All Categories ({items.length})
+            🍽️ All Dishes ({items.length})
           </button>
-          {categories.map(c => {
-            const count = items.filter(it => it.category_id === c.id).length;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCat(c.id)}
-                className={`btn btn-sm ${selectedCat === c.id ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap' }}
-              >
-                {c.name} ({count})
-              </button>
-            );
-          })}
+          <button
+            onClick={() => setSelectedCat('VEG')}
+            className={`btn btn-sm ${selectedCat === 'VEG' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              borderRadius: 'var(--radius-full)',
+              whiteSpace: 'nowrap',
+              fontWeight: 700,
+              background: selectedCat === 'VEG' ? 'var(--primary-gradient)' : 'rgba(16, 185, 129, 0.15)',
+              borderColor: selectedCat === 'VEG' ? 'transparent' : 'rgba(16, 185, 129, 0.4)',
+              color: selectedCat === 'VEG' ? '#fff' : '#10b981',
+            }}
+          >
+            🌱 Veg ({items.filter(i => i.is_vegetarian).length})
+          </button>
+          <button
+            onClick={() => setSelectedCat('NON_VEG')}
+            className={`btn btn-sm ${selectedCat === 'NON_VEG' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              borderRadius: 'var(--radius-full)',
+              whiteSpace: 'nowrap',
+              fontWeight: 700,
+              background: selectedCat === 'NON_VEG' ? 'var(--primary-gradient)' : 'rgba(239, 68, 68, 0.15)',
+              borderColor: selectedCat === 'NON_VEG' ? 'transparent' : 'rgba(239, 68, 68, 0.4)',
+              color: selectedCat === 'NON_VEG' ? '#fff' : '#ef4444',
+            }}
+          >
+            🍗 Non-Veg ({items.filter(i => !i.is_vegetarian).length})
+          </button>
+          <button
+            onClick={() => setSelectedCat('STARTERS')}
+            className={`btn btn-sm ${selectedCat === 'STARTERS' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              borderRadius: 'var(--radius-full)',
+              whiteSpace: 'nowrap',
+              fontWeight: 700,
+              background: selectedCat === 'STARTERS' ? 'var(--primary-gradient)' : 'rgba(245, 158, 11, 0.15)',
+              borderColor: selectedCat === 'STARTERS' ? 'transparent' : 'rgba(245, 158, 11, 0.4)',
+              color: selectedCat === 'STARTERS' ? '#fff' : '#f59e0b',
+            }}
+          >
+            🥟 All Starters ({items.filter(isItemStarter).length})
+          </button>
+          <button
+            onClick={() => setSelectedCat('VEG_STARTERS')}
+            className={`btn btn-sm ${selectedCat === 'VEG_STARTERS' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              borderRadius: 'var(--radius-full)',
+              whiteSpace: 'nowrap',
+              fontWeight: 700,
+              background: selectedCat === 'VEG_STARTERS' ? 'var(--primary-gradient)' : 'rgba(16, 185, 129, 0.1)',
+              borderColor: selectedCat === 'VEG_STARTERS' ? 'transparent' : 'rgba(16, 185, 129, 0.35)',
+              color: selectedCat === 'VEG_STARTERS' ? '#fff' : '#34d399',
+            }}
+          >
+            🥦 Veg Starters ({items.filter(i => isItemStarter(i) && i.is_vegetarian).length})
+          </button>
+          <button
+            onClick={() => setSelectedCat('NON_VEG_STARTERS')}
+            className={`btn btn-sm ${selectedCat === 'NON_VEG_STARTERS' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              borderRadius: 'var(--radius-full)',
+              whiteSpace: 'nowrap',
+              fontWeight: 700,
+              background: selectedCat === 'NON_VEG_STARTERS' ? 'var(--primary-gradient)' : 'rgba(239, 68, 68, 0.1)',
+              borderColor: selectedCat === 'NON_VEG_STARTERS' ? 'transparent' : 'rgba(239, 68, 68, 0.35)',
+              color: selectedCat === 'NON_VEG_STARTERS' ? '#fff' : '#f87171',
+            }}
+          >
+            🍗 Non-Veg Starters ({items.filter(i => isItemStarter(i) && !i.is_vegetarian).length})
+          </button>
+
+          {categories
+            .filter(c => !['veg', 'non-veg', 'starters', 'starter', 'veg starters', 'non-veg starters'].includes(c.name.toLowerCase().trim()))
+            .map(c => {
+              const count = items.filter(it => it.category_id === c.id).length;
+              const isSelected = selectedCat === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedCat(c.id)}
+                  className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap' }}
+                >
+                  {c.name} ({count})
+                </button>
+              );
+            })}
         </div>
 
         {/* Second Row: Dietary Filter Pills + Search Input */}
@@ -486,15 +772,19 @@ export default function MenuView() {
       {loading ? (
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-          Loading restaurant menu catalog...
+          Loading restaurant menu...
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="glass-panel" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <UtensilsCrossed size={36} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>No dishes found</h3>
-          <p style={{ fontSize: '0.85rem', marginTop: '6px' }}>
-            Try adjusting your search query, category, or dietary filter.
+          <p style={{ fontSize: '0.85rem', marginTop: '6px', marginBottom: '16px' }}>
+            Try adjusting your search query, category, or dietary filter, or add a new dish to the menu.
           </p>
+          <button onClick={openAddModal} className="btn btn-primary" style={{ margin: '0 auto', display: 'inline-flex' }}>
+            <Plus size={16} />
+            <span>+ Add Menu</span>
+          </button>
         </div>
       ) : (
         <div
@@ -682,15 +972,76 @@ export default function MenuView() {
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {/* Interactive Add to Cart button */}
+                        {(() => {
+                          const inCart = cart.find(c => c.item.id === item.id);
+                          const cartQty = inCart ? inCart.quantity : 0;
+                          if (cartQty > 0) {
+                            return (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: 'var(--primary-gradient)',
+                                  borderRadius: 'var(--radius-md)',
+                                  padding: '2px 4px',
+                                  boxShadow: 'var(--shadow-glow)',
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateCartQty(item.id, -1)}
+                                  title="Decrease quantity"
+                                  style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
+                                >
+                                  <Minus size={13} />
+                                </button>
+                                <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.8rem', minWidth: '18px', textAlign: 'center' }}>
+                                  {cartQty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddToCart(item)}
+                                  title="Add more"
+                                  style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
+                                >
+                                  <Plus size={13} />
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleAddToCart(item)}
+                              disabled={!isAvailable || isOutOfStock}
+                              className="btn btn-primary btn-sm"
+                              title={!isAvailable || isOutOfStock ? 'Dish is currently sold out' : 'Add dish to order cart'}
+                              style={{
+                                padding: '7px 12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                gap: '5px',
+                                opacity: !isAvailable || isOutOfStock ? 0.6 : 1,
+                                cursor: !isAvailable || isOutOfStock ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <ShoppingCart size={13} />
+                              <span>Add to Cart</span>
+                            </button>
+                          );
+                        })()}
+
                         {/* Recipe Ingredients Button */}
                         <button
                           onClick={() => openRecipeModal(item)}
                           className="btn btn-secondary btn-sm"
                           title="View Recipe Ingredients"
-                          style={{ padding: '7px 10px', fontSize: '0.75rem', gap: '4px' }}
+                          style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
                         >
-                          <ChefHat size={14} style={{ color: '#f59e0b' }} />
+                          <ChefHat size={13} style={{ color: '#f59e0b' }} />
                           <span>Recipe</span>
                         </button>
 
@@ -700,18 +1051,20 @@ export default function MenuView() {
                             <button
                               onClick={() => openEditModal(item)}
                               className="btn btn-secondary btn-sm"
-                              title="Edit Dish"
-                              style={{ padding: '7px' }}
+                              title="Edit Dish Details"
+                              style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
                             >
                               <Edit2 size={13} />
+                              <span>Edit</span>
                             </button>
                             <button
                               onClick={() => setItemToDelete(item)}
                               className="btn btn-danger btn-sm"
-                              title="Delete Dish"
-                              style={{ padding: '7px' }}
+                              title="Delete Dish from Menu"
+                              style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
                             >
                               <Trash2 size={13} />
+                              <span>Delete</span>
                             </button>
                           </>
                         )}
@@ -965,7 +1318,7 @@ export default function MenuView() {
                   <UtensilsCrossed size={18} />
                 </div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-                  {editingItem ? 'Edit Dish Details' : 'Add Dish to Menu Catalog'}
+                  {editingItem ? 'Edit Dish Details' : 'Add Dish to Menu'}
                 </h2>
               </div>
               <button onClick={() => setShowModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -988,12 +1341,59 @@ export default function MenuView() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Category *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Category *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCatModal(true)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      + New Category
+                    </button>
+                  </div>
                   <select required value={categoryId} onChange={e => setCategoryId(e.target.value)} className="select">
                     {categories.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
+                  {/* Quick Category Select Pills */}
+                  <div style={{ display: 'flex', gap: '5px', marginTop: '7px', flexWrap: 'wrap' }}>
+                    {[
+                      { label: 'Starters', veg: null },
+                      { label: 'Veg Starters', veg: true },
+                      { label: 'Non-Veg Starters', veg: false },
+                      { label: 'Veg Main Course', veg: true },
+                      { label: 'Non-Veg Main Course', veg: false },
+                      { label: 'Desserts', veg: true },
+                      { label: 'Beverages', veg: true },
+                    ].map(preset => {
+                      const matched = categories.find(c => c.name.toLowerCase() === preset.label.toLowerCase());
+                      const isSelected = matched && categoryId === matched.id;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => handleSelectOrAddPresetCat(preset.label, preset.veg)}
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '0.68rem',
+                            borderRadius: '4px',
+                            border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border-subtle)'}`,
+                            background: isSelected ? 'var(--primary-gradient)' : 'rgba(255,255,255,0.06)',
+                            color: isSelected ? '#fff' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontWeight: isSelected ? 700 : 500,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                        >
+                          <span>{isSelected ? '✓' : '+'}</span>
+                          <span>{preset.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div>
@@ -1022,27 +1422,53 @@ export default function MenuView() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Dietary Classification</label>
-                  <div
-                    onClick={() => setIsVeg(!isVeg)}
-                    style={{
-                      height: '42px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '0 12px',
-                      borderRadius: 'var(--radius-md)',
-                      background: isVeg ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      border: `1px solid ${isVeg ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div className={`food-symbol ${isVeg ? 'veg' : 'nonveg'}`} style={{ width: '14px', height: '14px', padding: '1px' }}>
-                      {isVeg ? <span style={{ width: '7px', height: '7px' }} /> : <span style={{ borderLeftWidth: '3.5px', borderRightWidth: '3.5px', borderBottomWidth: '7px' }} />}
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Food Type (Veg / Non-Veg) *</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div
+                      onClick={() => setIsVeg(true)}
+                      style={{
+                        height: '42px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        borderRadius: 'var(--radius-md)',
+                        background: isVeg ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                        border: `2px solid ${isVeg ? '#10b981' : 'var(--border-subtle)'}`,
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        color: isVeg ? '#10b981' : 'var(--text-muted)',
+                      }}
+                    >
+                      <span className="food-symbol veg" style={{ width: '12px', height: '12px', padding: '1px' }}>
+                        <span style={{ width: '6px', height: '6px' }} />
+                      </span>
+                      <span>🌱 Pure Veg</span>
                     </div>
-                    <span style={{ fontSize: '0.825rem', fontWeight: 700, color: isVeg ? 'var(--success)' : 'var(--danger)' }}>
-                      {isVeg ? 'Pure Vegetarian' : 'Non-Vegetarian'}
-                    </span>
+
+                    <div
+                      onClick={() => setIsVeg(false)}
+                      style={{
+                        height: '42px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        borderRadius: 'var(--radius-md)',
+                        background: !isVeg ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                        border: `2px solid ${!isVeg ? '#ef4444' : 'var(--border-subtle)'}`,
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        color: !isVeg ? '#ef4444' : 'var(--text-muted)',
+                      }}
+                    >
+                      <span className="food-symbol nonveg" style={{ width: '12px', height: '12px', padding: '1px' }}>
+                        <span style={{ borderLeftWidth: '3px', borderRightWidth: '3px', borderBottomWidth: '6px' }} />
+                      </span>
+                      <span>🍗 Non-Veg</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1117,10 +1543,34 @@ export default function MenuView() {
             <form onSubmit={handleCreateCategory} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Category Name *</label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suggestions:</span>
+                  {['Starters', 'Veg Starters', 'Non-Veg Starters', 'Veg Main Course', 'Non-Veg Main Course', 'Desserts', 'Beverages'].map(name => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        setNewCatName(name);
+                        setNewCatDesc(`${name} selection for restaurant guests`);
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: '4px',
+                        padding: '2px 7px',
+                        fontSize: '0.68rem',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      + {name}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Clay Oven Tandoori"
+                  placeholder="e.g. Starters, Tandoori Specials..."
                   value={newCatName}
                   onChange={e => setNewCatName(e.target.value)}
                   className="input"
@@ -1171,6 +1621,283 @@ export default function MenuView() {
                 Confirm Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bottom Cart Bar (when cart has items and drawer is closed) */}
+      {cartCount > 0 && !showCartDrawer && (
+        <div
+          onClick={() => setShowCartDrawer(true)}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '28px',
+            zIndex: 120,
+            background: 'var(--primary-gradient)',
+            color: '#fff',
+            padding: '12px 22px',
+            borderRadius: 'var(--radius-full)',
+            boxShadow: '0 8px 30px rgba(99, 102, 241, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            transition: 'transform 0.2s ease',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)')}
+          onMouseLeave={e => (e.currentTarget.style.transform = 'none')}
+        >
+          <div style={{ position: 'relative' }}>
+            <ShoppingCart size={20} />
+            <span
+              style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '-8px',
+                background: '#fff',
+                color: 'var(--primary)',
+                fontSize: '0.7rem',
+                fontWeight: 800,
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {cartCount}
+            </span>
+          </div>
+          <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>
+            {cartCount} {cartCount === 1 ? 'item' : 'items'} in Cart &bull; ₹{cartTotal.toFixed(2)}
+          </div>
+          <span style={{ background: 'rgba(255,255,255,0.25)', padding: '4px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 700 }}>
+            View Cart &rarr;
+          </span>
+        </div>
+      )}
+
+      {/* Slide-out Order Cart Drawer */}
+      {showCartDrawer && (
+        <div className="modal-overlay" onClick={() => setShowCartDrawer(false)} style={{ zIndex: 140 }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              maxWidth: '460px',
+              background: 'var(--bg-secondary)',
+              borderLeft: '1px solid var(--border-subtle)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: 'var(--shadow-xl)',
+              zIndex: 150,
+            }}
+          >
+            {/* Drawer Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-md)', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  <ShoppingCart size={18} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Order Cart</h2>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{cartCount} items selected</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {cart.length > 0 && (
+                  <button onClick={handleClearCart} className="btn btn-secondary btn-sm" style={{ fontSize: '0.75rem', padding: '4px 8px' }}>
+                    Clear
+                  </button>
+                )}
+                <button onClick={() => setShowCartDrawer(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}>
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Drawer Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Order Type Toggle */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-tertiary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('DINE_IN')}
+                  className={`btn btn-sm ${orderType === 'DINE_IN' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ border: 'none', borderRadius: 'var(--radius-sm)', justifyContent: 'center' }}
+                >
+                  🍽️ Dine-In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('TAKEAWAY')}
+                  className={`btn btn-sm ${orderType === 'TAKEAWAY' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ border: 'none', borderRadius: 'var(--radius-sm)', justifyContent: 'center' }}
+                >
+                  🥡 Takeaway
+                </button>
+              </div>
+
+              {/* Table Selection for Dine-in */}
+              {orderType === 'DINE_IN' && (
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                    Select Table *
+                  </label>
+                  <select
+                    value={selectedTable}
+                    onChange={e => setSelectedTable(e.target.value)}
+                    className="select"
+                    style={{ width: '100%' }}
+                  >
+                    {tablesList.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.table_number || `Table #${t.id.slice(-4)}`} &bull; Capacity: {t.capacity} ({t.status})
+                      </option>
+                    ))}
+                    {tablesList.length === 0 && <option value="">No tables found</option>}
+                  </select>
+                </div>
+              )}
+
+              {/* Guest Details */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Guest Name</label>
+                  <input
+                    type="text"
+                    placeholder="Guest Name"
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                    className="input"
+                    style={{ height: '36px', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="Phone number"
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
+                    className="input"
+                    style={{ height: '36px', fontSize: '0.8rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '14px' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.04em' }}>
+                  Selected Items ({cart.length})
+                </div>
+
+                {cart.length === 0 ? (
+                  <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <ShoppingCart size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                    <div style={{ fontWeight: 600 }}>Your cart is empty</div>
+                    <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>Click "+ Add to Cart" on any dish to add it here.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {cart.map((c) => {
+                      const itemTotal = parseFloat(c.item.price || 0) * c.quantity;
+                      return (
+                        <div
+                          key={c.item.id}
+                          style={{
+                            background: 'var(--bg-tertiary)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '12px 14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div className={`food-symbol ${c.item.is_vegetarian ? 'veg' : 'nonveg'}`} style={{ width: '12px', height: '12px', padding: '1px' }}>
+                                {c.item.is_vegetarian ? <span style={{ width: '6px', height: '6px' }} /> : <span style={{ borderLeftWidth: '3px', borderRightWidth: '3px', borderBottomWidth: '6px' }} />}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>{c.item.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>₹{parseFloat(c.item.price || 0).toFixed(2)} / plate</div>
+                              </div>
+                            </div>
+                            <div style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'Outfit', fontSize: '0.95rem' }}>
+                              ₹{itemTotal.toFixed(2)}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                            <input
+                              type="text"
+                              placeholder="Notes (e.g. less spicy)..."
+                              value={c.instructions}
+                              onChange={e => handleUpdateCartInstructions(c.item.id, e.target.value)}
+                              className="input"
+                              style={{ height: '30px', fontSize: '0.72rem', flex: 1, marginRight: '10px' }}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-sm)', padding: '2px 4px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCartQty(c.item.id, -1)}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '3px 6px', display: 'flex' }}
+                              >
+                                <Minus size={13} />
+                              </button>
+                              <span style={{ fontWeight: 800, fontSize: '0.825rem', minWidth: '16px', textAlign: 'center' }}>{c.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleAddToCart(c.item)}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '3px 6px', display: 'flex' }}
+                              >
+                                <Plus size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Drawer Footer / Checkout */}
+            {cart.length > 0 && (
+              <div style={{ padding: '18px 24px', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-tertiary)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+                  <span>Subtotal</span>
+                  <span>₹{cartSubtotal.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+                  <span>GST (5%)</span>
+                  <span>₹{cartTax.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', borderTop: '1px dashed var(--border-subtle)', paddingTop: '8px' }}>
+                  <span>Total Payable</span>
+                  <span style={{ color: 'var(--primary)', fontFamily: 'Outfit' }}>₹{cartTotal.toFixed(2)}</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePlaceOrder}
+                  disabled={placingOrder}
+                  className="btn btn-primary"
+                  style={{ width: '100%', padding: '12px', justifyContent: 'center', fontSize: '0.925rem', fontWeight: 800, boxShadow: 'var(--shadow-glow)' }}
+                >
+                  {placingOrder ? 'Sending to Kitchen...' : `Place Order & Send to Kitchen (₹${cartTotal.toFixed(2)})`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

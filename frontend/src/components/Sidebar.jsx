@@ -2,18 +2,18 @@ import React from 'react';
 import { 
   LayoutDashboard, ShoppingBag, Clock, ChefHat, Grid, 
   Receipt, UtensilsCrossed, Boxes, Users, BarChart3, UserCog,
-  Sparkles, LogOut, ShieldCheck, Lock
+  Sparkles, LogOut, ShieldCheck, Lock, PlusCircle
 } from 'lucide-react';
 import { useAuth, ROLE_PERMISSIONS } from '../context/AuthContext';
 
 export const ALL_NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'pos', label: 'POS Terminal', icon: ShoppingBag, badge: 'HOT' },
+  { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
+  { id: 'add-menu', label: 'Add Menu', icon: PlusCircle },
   { id: 'orders', label: 'Live Orders', icon: Clock },
   { id: 'kitchen', label: 'Kitchen (KDS)', icon: ChefHat },
   { id: 'tables', label: 'Tables & Floor', icon: Grid },
   { id: 'billing', label: 'Billing', icon: Receipt },
-  { id: 'menu', label: 'Menu Catalog', icon: UtensilsCrossed },
   { id: 'inventory', label: 'Inventory', icon: Boxes },
   { id: 'feedback', label: 'Feedback', icon: Users },
   { id: 'reports', label: 'Analytics', icon: BarChart3 },

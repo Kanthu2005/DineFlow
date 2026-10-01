@@ -9,7 +9,7 @@ export const ROLE_PERMISSIONS = {
     stationName: 'Executive Admin Terminal',
     badgeColor: '#818cf8',
     defaultView: 'dashboard',
-    allowedViews: ['dashboard', 'pos', 'orders', 'kitchen', 'tables', 'billing', 'menu', 'inventory', 'feedback', 'reports', 'users'],
+    allowedViews: ['dashboard', 'menu', 'add-menu', 'orders', 'kitchen', 'tables', 'billing', 'inventory', 'feedback', 'reports', 'users'],
     canEditMenu: true,
     canSettleBills: true,
     canManageTables: true,
@@ -20,7 +20,7 @@ export const ROLE_PERMISSIONS = {
     stationName: 'Operations Manager Desk',
     badgeColor: '#38bdf8',
     defaultView: 'dashboard',
-    allowedViews: ['dashboard', 'pos', 'orders', 'kitchen', 'tables', 'billing', 'menu', 'inventory', 'feedback', 'reports'],
+    allowedViews: ['dashboard', 'menu', 'add-menu', 'orders', 'kitchen', 'tables', 'billing', 'inventory', 'feedback', 'reports'],
     canEditMenu: true,
     canSettleBills: true,
     canManageTables: true,
@@ -31,7 +31,7 @@ export const ROLE_PERMISSIONS = {
     stationName: 'Kitchen Display Line (KDS)',
     badgeColor: '#f97316',
     defaultView: 'kitchen',
-    allowedViews: ['kitchen', 'menu', 'orders', 'inventory'],
+    allowedViews: ['kitchen', 'menu', 'add-menu', 'orders', 'inventory'],
     canEditMenu: true,
     canSettleBills: false,
     canManageTables: false,
@@ -42,8 +42,8 @@ export const ROLE_PERMISSIONS = {
     stationName: 'Server & Dining Floor Station',
     badgeColor: '#10b981',
     defaultView: 'tables',
-    allowedViews: ['tables', 'pos', 'orders', 'menu', 'feedback'],
-    canEditMenu: false,
+    allowedViews: ['tables', 'menu', 'add-menu', 'orders', 'feedback'],
+    canEditMenu: true,
     canSettleBills: false,
     canManageTables: true,
     canManageUsers: false,
@@ -158,6 +158,57 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const [staffList, setStaffList] = useState([]);
+
+  const refreshStaff = async () => {
+    try {
+      const res = await api.users.getAll();
+      if (Array.isArray(res)) {
+        setStaffList(res);
+      }
+    } catch (e) {
+      console.warn('Could not load staff list:', e);
+    }
+  };
+
+  useEffect(() => {
+    refreshStaff();
+  }, [user]);
+
+  const switchPerson = async (person) => {
+    if (!person) return;
+    if (typeof person === 'string') {
+      return await switchRole(person);
+    }
+    const preset = PRESET_ACCOUNTS.find(
+      a => a.email.toLowerCase() === (person.email || '').toLowerCase() || a.role === person.role
+    );
+    if (preset) {
+      try {
+        const res = await api.auth.login(preset.email, 'Password123!');
+        if (res?.access_token) {
+          setToken(res.access_token);
+          setTokenState(res.access_token);
+          const usr = { ...res.user, name: person.name || res.user?.name, role: (person.role || res.user?.role || preset.role).toUpperCase() };
+          setCurrentUser(usr);
+          setUser(usr);
+          return usr;
+        }
+      } catch (err) {
+        console.warn('Preset login failed, using local session:', err);
+      }
+    }
+    const usr = {
+      id: person.id || person._id,
+      name: person.name,
+      email: person.email,
+      role: (person.role || 'STAFF').toUpperCase(),
+    };
+    setCurrentUser(usr);
+    setUser(usr);
+    return usr;
+  };
+
   const login = async (email, password) => {
     const res = await api.auth.login(email, password);
     if (res?.access_token) {
@@ -189,8 +240,11 @@ export function AuthProvider({ children }) {
         permissions,
         token: tokenState,
         backendStatus,
+        staffList,
+        refreshStaff,
         checkHealth,
         switchRole,
+        switchPerson,
         isAllowed: (viewId) => isViewAllowedForRole(normalizedRole, viewId),
         defaultView: permissions.defaultView || 'dashboard',
         login,

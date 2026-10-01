@@ -6,7 +6,6 @@ import Header from './components/Header';
 import { ShieldAlert, ArrowRight, Lock, CheckCircle2 } from 'lucide-react';
 
 import DashboardView from './views/DashboardView';
-import PosView from './views/PosView';
 import OrdersView from './views/OrdersView';
 import KitchenView from './views/KitchenView';
 import TablesView from './views/TablesView';
@@ -177,8 +176,8 @@ function AppContent() {
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')
       ) {
         e.preventDefault();
-        if (isAllowed('pos')) {
-          handleNavigate('pos');
+        if (isAllowed('menu')) {
+          handleNavigate('menu');
         }
       }
     };
@@ -220,16 +219,20 @@ function AppContent() {
           ) : (
             <>
               {currentView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
-              {currentView === 'pos' && <PosView onOrderPlaced={() => handleNavigate('orders')} />}
+              {currentView === 'menu' && <MenuView onNavigate={handleNavigate} initialTab="browse" />}
+              {currentView === 'add-menu' && <MenuView onNavigate={handleNavigate} initialTab="add" />}
               {currentView === 'orders' && <OrdersView onNavigateToBilling={handleNavigateToBilling} />}
               {currentView === 'kitchen' && <KitchenView />}
-              {currentView === 'tables' && <TablesView onNavigateToPOS={(tblId) => handleNavigate('pos')} onNavigateToBilling={() => handleNavigate('billing')} />}
-              {currentView === 'billing' && <BillingView targetInvoice={targetInvoiceForBilling} />}
-              {currentView === 'menu' && <MenuView />}
+              {currentView === 'tables' && (
+                <TablesView 
+                  onNavigateToBilling={(target) => handleNavigateToBilling(target)} 
+                />
+              )}
+              {currentView === 'billing' && <BillingView targetInvoice={targetInvoiceForBilling} onNavigate={handleNavigate} />}
               {currentView === 'inventory' && <InventoryView />}
               {currentView === 'feedback' && <FeedbackView />}
               {currentView === 'reports' && <ReportsView />}
-              {currentView === 'users' && <UsersView />}
+              {currentView === 'users' && <UsersView onNavigate={handleNavigate} />}
             </>
           )}
         </main>

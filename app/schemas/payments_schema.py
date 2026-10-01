@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class InvoiceCreate(BaseModel):
     order_id: str
+    discount_amount: Decimal | None = None
 
 class InvoiceResponse(BaseModel):
     id: str

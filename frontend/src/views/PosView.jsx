@@ -16,7 +16,7 @@ const PRESET_DISH_IMAGES = [
   { label: 'Indian Curry', url: 'https://images.unsplash.com/photo-1545247181-516773cae754?w=600' },
 ];
 
-export default function PosView({ onOrderPlaced }) {
+export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
   const { role, permissions } = useAuth();
   const canManageMenu = permissions?.canEditMenu ?? (role === 'ADMIN' || role === 'MANAGER' || role === 'CHEF');
   const { showToast } = useToast();
@@ -59,6 +59,34 @@ export default function PosView({ onOrderPlaced }) {
     loadPosData();
   }, []);
 
+  useEffect(() => {
+    if (initialTableId) {
+      setSelectedTable(initialTableId);
+    } else {
+      const savedTable = localStorage.getItem('dineflow_pos_selected_table');
+      if (savedTable) {
+        setSelectedTable(savedTable);
+        localStorage.removeItem('dineflow_pos_selected_table');
+      }
+    }
+  }, [initialTableId]);
+
+  useEffect(() => {
+    const rawDish = localStorage.getItem('dineflow_pos_add_dish');
+    if (rawDish && items.length > 0) {
+      try {
+        const dish = JSON.parse(rawDish);
+        const target = items.find((it) => it.id === dish.id) || dish;
+        addToCart(target);
+        showToast(`Added "${target.name}" from Menu to cart!`, 'success');
+      } catch (e) {
+        console.error('Failed to parse dish from menu:', e);
+      } finally {
+        localStorage.removeItem('dineflow_pos_add_dish');
+      }
+    }
+  }, [items]);
+
   const loadPosData = async () => {
     setLoading(true);
     try {
@@ -74,7 +102,7 @@ export default function PosView({ onOrderPlaced }) {
       setAvailabilityMap(availRes || {});
     } catch (err) {
       console.error('POS data error:', err);
-      showToast('Could not load menu catalog or tables', 'error');
+      showToast('Could not load menu or tables', 'error');
     } finally {
       setLoading(false);
     }
@@ -137,7 +165,7 @@ export default function PosView({ onOrderPlaced }) {
         showToast(`Dish "${dishName}" updated successfully!`, 'success');
       } else {
         await api.menu.createItem(payload);
-        showToast(`Dish "${dishName}" added to menu catalog!`, 'success');
+        showToast(`Dish "${dishName}" added to menu!`, 'success');
       }
       setShowDishModal(false);
       await loadPosData();
@@ -157,7 +185,7 @@ export default function PosView({ onOrderPlaced }) {
     if (!dishToDelete) return;
     try {
       await api.menu.deleteItem(dishToDelete.id);
-      showToast(`Dish "${dishToDelete.name}" removed from catalog`, 'success');
+      showToast(`Dish "${dishToDelete.name}" removed from menu`, 'success');
       setDishToDelete(null);
       await loadPosData();
     } catch (err) {
@@ -253,9 +281,10 @@ export default function PosView({ onOrderPlaced }) {
     return sum + p * c.quantity;
   }, 0);
 
-  const tax = subtotal * 0.05; // 5% GST
   const discount = Math.min(subtotal, Math.max(0, parseFloat(discountAmount) || 0));
-  const total = Math.max(0, subtotal + tax - discount);
+  const taxableAmount = Math.max(0, subtotal - discount);
+  const tax = taxableAmount * 0.05; // 5% GST on taxable base
+  const total = taxableAmount + tax;
 
   // Place Order with Backend Cart-Level Stock Validation
   const handlePlaceOrder = async () => {
@@ -291,6 +320,7 @@ export default function PosView({ onOrderPlaced }) {
         customer_phone: customerPhone || '9876543210',
         table_id: orderType === 'DINE_IN' ? selectedTable : null,
         order_type: orderType,
+        discount_amount: discount,
         items: cart.map((c) => ({
           menu_item_id: c.item.id,
           quantity: c.quantity,
@@ -431,23 +461,37 @@ export default function PosView({ onOrderPlaced }) {
             ))}
           </div>
 
-          {canManageMenu && (
-            <button
-              type="button"
-              onClick={openAddDishModal}
-              className="btn btn-sm btn-primary"
-              style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px' }}
-            >
-              <Plus size={14} />
-              <span>Add Dish</span>
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('menu')}
+                className="btn btn-sm btn-secondary"
+                style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px' }}
+                title="Manage Restaurant Menu"
+              >
+                <Utensils size={14} />
+                <span>Menu</span>
+              </button>
+            )}
+            {canManageMenu && (
+              <button
+                type="button"
+                onClick={openAddDishModal}
+                className="btn btn-sm btn-primary"
+                style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px' }}
+              >
+                <Plus size={14} />
+                <span>Add Dish</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Dishes Grid */}
         {loading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading menu catalog and stock availability...
+            Loading menu and stock availability...
           </div>
         ) : filteredItems.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -970,7 +1014,7 @@ export default function PosView({ onOrderPlaced }) {
                     {editingDish ? 'Edit Dish & Price' : 'Add New Culinary Dish'}
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Updates live in POS and Menu Catalog immediately
+                    Updates live in POS and Menu immediately
                   </span>
                 </div>
               </div>
@@ -1133,7 +1177,7 @@ export default function PosView({ onOrderPlaced }) {
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Remove Dish from Menu?</h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: '20px' }}>
-              Are you sure you want to remove <strong>"{dishToDelete.name}"</strong>? It will no longer appear in the POS or Menu Catalog.
+              Are you sure you want to remove <strong>"{dishToDelete.name}"</strong>? It will no longer appear in the POS or Menu.
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setDishToDelete(null)} className="btn btn-secondary" style={{ flex: 1 }}>

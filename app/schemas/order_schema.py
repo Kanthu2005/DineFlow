@@ -40,6 +40,7 @@ class OrderCreate(BaseModel):
     customer_phone: str | None = None
     table_id: str | None = None
     order_type: str = "DINE_IN"
+    discount_amount: Decimal | None = None
     created_by: str | None = None
     items: list[OrderItemCreate] | None = None
 

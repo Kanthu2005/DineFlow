@@ -118,21 +118,34 @@ export default function Header({ currentView, onSearch, theme, onToggleTheme, on
           )}
         </div>
 
-        {/* 1-Click Role Switcher */}
+        {/* 1-Click Person & Role Switcher */}
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
             className="btn btn-secondary btn-sm"
             style={{
-              padding: '6px 12px',
+              padding: '6px 14px',
               borderRadius: 'var(--radius-full)',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
+              border: `1px solid ${permissions?.badgeColor || 'var(--border-subtle)'}`,
             }}
           >
-            <Shield size={14} style={{ color: 'var(--primary)' }} />
-            <span style={{ fontWeight: 600 }}>{role}</span>
+            <Shield size={14} style={{ color: permissions?.badgeColor || 'var(--primary)' }} />
+            <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>{user?.name || role}</span>
+            <span
+              style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                padding: '1px 6px',
+                borderRadius: '4px',
+                background: permissions?.badgeColor || 'var(--primary)',
+                color: '#fff',
+              }}
+            >
+              {role}
+            </span>
             <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
 
@@ -142,7 +155,7 @@ export default function Header({ currentView, onSearch, theme, onToggleTheme, on
                 position: 'absolute',
                 top: 'calc(100% + 8px)',
                 right: 0,
-                width: '240px',
+                width: '280px',
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-lg)',
@@ -150,40 +163,68 @@ export default function Header({ currentView, onSearch, theme, onToggleTheme, on
                 padding: '8px',
                 zIndex: 200,
                 backdropFilter: 'blur(16px)',
+                maxHeight: '380px',
+                overflowY: 'auto',
               }}
             >
-              <div style={{ padding: '6px 10px', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                1-CLICK STATION SWITCHER
+              <div style={{ padding: '6px 10px', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                SWITCH STAFF PERSON / ROLE
               </div>
-              {PRESET_ACCOUNTS.map((acc) => (
-                <div
-                  key={acc.role}
-                  onClick={() => handleRoleSelect(acc.role)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    cursor: 'pointer',
-                    background: role === acc.role ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                    color: role === acc.role ? 'var(--primary)' : 'var(--text-primary)',
-                    fontSize: '0.825rem',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)')}
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background =
-                      role === acc.role ? 'rgba(99, 102, 241, 0.15)' : 'transparent')
-                  }
-                >
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{acc.title}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{acc.email}</div>
+
+              {/* Preset Station Persons */}
+              {PRESET_ACCOUNTS.map((acc) => {
+                const perms = ROLE_PERMISSIONS[acc.role] || {};
+                const isCurrent = user?.email?.toLowerCase() === acc.email.toLowerCase() || (role === acc.role && !user?.email);
+                return (
+                  <div
+                    key={acc.email}
+                    onClick={() => {
+                      setRoleDropdownOpen(false);
+                      handleRoleSelect(acc.role);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      background: isCurrent ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                      color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
+                      fontSize: '0.825rem',
+                      transition: 'all 0.15s ease',
+                      marginBottom: '2px',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)')}
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background =
+                        isCurrent ? 'rgba(99, 102, 241, 0.15)' : 'transparent')
+                    }
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontWeight: 700 }}>{acc.name}</span>
+                        <span
+                          style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '3px',
+                            background: perms.badgeColor || '#6366f1',
+                            color: '#fff',
+                          }}
+                        >
+                          {acc.role}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        {perms.stationName || acc.email}
+                      </div>
+                    </div>
+                    {isCurrent && <Check size={14} style={{ color: 'var(--primary)' }} />}
                   </div>
-                  {role === acc.role && <Check size={14} style={{ color: 'var(--primary)' }} />}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

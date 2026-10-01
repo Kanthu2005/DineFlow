@@ -175,8 +175,9 @@ class Order:
 
     def recalculate(self) -> None:
         self.subtotal = self.calculate_subtotal()
-        self.tax_amount = self.calculate_tax(self.subtotal)
-        total = self.subtotal - self.discount_amount + self.tax_amount
+        taxable = max(Decimal("0"), self.subtotal - self.discount_amount)
+        self.tax_amount = self.calculate_tax(taxable)
+        total = taxable + self.tax_amount
         self.total_amount = max(Decimal("0"), total.quantize(Decimal("0.01")))
 
     def can_confirm(self) -> bool:
