@@ -26,6 +26,7 @@ from app.routes import (
     kitchen_event_router,
     feedback_router,
     report_router,
+    purchase_router,
 )
 
 __all__ = [
@@ -50,4 +51,5 @@ __all__ = [
     "kitchen_event_router",
     "feedback_router",
     "report_router",
+    "purchase_router",
 ]

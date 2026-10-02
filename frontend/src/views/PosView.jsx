@@ -21,10 +21,12 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
   const canManageMenu = permissions?.canEditMenu ?? (role === 'ADMIN' || role === 'MANAGER' || role === 'CHEF');
   const { showToast } = useToast();
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [items, setItems] = useState([]);
   const [tables, setTables] = useState([]);
   const [availabilityMap, setAvailabilityMap] = useState({});
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedSubcat, setSelectedSubcat] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [dietFilter, setDietFilter] = useState('ALL'); // 'ALL' | 'VEG' | 'NON_VEG'
   const [loading, setLoading] = useState(true);
@@ -90,13 +92,15 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
   const loadPosData = async () => {
     setLoading(true);
     try {
-      const [catsRes, itemsRes, tablesRes, availRes] = await Promise.all([
+      const [catsRes, subcatsRes, itemsRes, tablesRes, availRes] = await Promise.all([
         api.menu.getCategories(),
+        api.menu.getSubcategories().catch(() => []),
         api.menu.getItems(),
         api.tables.getAll(),
         api.menu.getAvailability().catch(() => ({})),
       ]);
       setCategories(Array.isArray(catsRes) ? catsRes : []);
+      setSubcategories(Array.isArray(subcatsRes) ? subcatsRes : []);
       setItems(Array.isArray(itemsRes) ? itemsRes : []);
       setTables(Array.isArray(tablesRes) ? tablesRes : []);
       setAvailabilityMap(availRes || {});
@@ -266,13 +270,17 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
   const filteredItems = items.filter((item) => {
     const matchesCategory =
       selectedCategory === 'ALL' || item.category_id === selectedCategory;
+    const matchesSubcat =
+      selectedSubcat === 'ALL' || 
+      String(item.subcategory_id) === String(selectedSubcat) || 
+      (item.subcategory_name && item.subcategory_name.toLowerCase() === selectedSubcat.toLowerCase());
     const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
     let matchesDiet = true;
     if (dietFilter === 'VEG') matchesDiet = !!item.is_vegetarian;
     else if (dietFilter === 'NON_VEG') matchesDiet = !item.is_vegetarian;
-    return matchesCategory && matchesSearch && matchesDiet;
+    return matchesCategory && matchesSubcat && matchesSearch && matchesDiet;
   });
 
   // Financial calculations
@@ -443,7 +451,7 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
             <button
-              onClick={() => setSelectedCategory('ALL')}
+              onClick={() => { setSelectedCategory('ALL'); setSelectedSubcat('ALL'); }}
               className={`btn btn-sm ${selectedCategory === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ borderRadius: 'var(--radius-full)' }}
             >
@@ -452,7 +460,7 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
             {categories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
+                onClick={() => { setSelectedCategory(cat.id); setSelectedSubcat('ALL'); }}
                 className={`btn btn-sm ${selectedCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ borderRadius: 'var(--radius-full)' }}
               >
@@ -485,8 +493,60 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
                 <span>Add Dish</span>
               </button>
             )}
-          </div>
         </div>
+
+        {/* Subcategories Filter Chips */}
+        {subcategories.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 0 6px 0', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginRight: '4px' }}>
+              Subcategory:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedSubcat('ALL')}
+              style={{
+                padding: '3px 10px',
+                borderRadius: 'var(--radius-full)',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                border: '1px solid',
+                borderColor: selectedSubcat === 'ALL' ? 'var(--primary)' : 'var(--border-subtle)',
+                background: selectedSubcat === 'ALL' ? 'rgba(99, 102, 241, 0.25)' : 'var(--bg-tertiary)',
+                color: selectedSubcat === 'ALL' ? '#818cf8' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              All
+            </button>
+            {subcategories
+              .filter(s => selectedCategory === 'ALL' || String(s.category_id) === String(selectedCategory))
+              .map(sub => {
+                const isSelected = selectedSubcat === sub.id || selectedSubcat === sub.name;
+                return (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => setSelectedSubcat(sub.id)}
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: 'var(--radius-full)',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      border: '1px solid',
+                      borderColor: isSelected ? 'var(--primary)' : 'var(--border-subtle)',
+                      background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'var(--bg-tertiary)',
+                      color: isSelected ? '#818cf8' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {sub.name}
+                  </button>
+                );
+              })}
+          </div>
+        )}
 
         {/* Dishes Grid */}
         {loading ? (

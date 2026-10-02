@@ -3,11 +3,13 @@ import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { 
   Clock, Search, Filter, RefreshCw, CheckCircle, ChefHat, 
-  Receipt, XCircle, ChevronDown, ChevronUp, User, Table, Utensils
+  Receipt, XCircle, ChevronDown, ChevronUp, User, Table, Utensils,
+  PlusCircle, Sparkles, CheckCircle2, ArrowRight
 } from 'lucide-react';
+import AddMoreItemsModal from '../components/AddMoreItemsModal';
 
 const STATUS_TABS = [
-  'ALL', 'PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED', 'CANCELLED'
+  'ALL', 'PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'DELIVERED', 'COMPLETED', 'CANCELLED'
 ];
 
 export default function OrdersView({ onNavigateToBilling }) {
@@ -18,6 +20,8 @@ export default function OrdersView({ onNavigateToBilling }) {
   const [search, setSearch] = useState('');
   const [expandedOrders, setExpandedOrders] = useState({});
   const [updatingId, setUpdatingId] = useState(null);
+  const [addMoreOrder, setAddMoreOrder] = useState(null);
+  const [updatingItemId, setUpdatingItemId] = useState(null);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -45,16 +49,28 @@ export default function OrdersView({ onNavigateToBilling }) {
     try {
       await api.orders.updateStatus(orderId, newStatus);
       showToast(`Order status updated to ${newStatus}`, 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      loadOrders();
 
-      // If marked SERVED or COMPLETED, we can prompt for billing
-      if (newStatus === 'SERVED') {
-        showToast('Food served! You can now generate the bill under Billing tab.', 'info');
+      if (newStatus === 'SERVED' || newStatus === 'DELIVERED') {
+        showToast('Food delivered! You can add more items anytime or generate the bill.', 'info');
       }
     } catch (err) {
       showToast(err.message || 'Failed to update order status', 'danger');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
+    setUpdatingItemId(itemId);
+    try {
+      await api.orders.updateItemStatus(orderId, itemId, newStatus);
+      showToast(`Item updated to ${newStatus}`, 'success');
+      loadOrders();
+    } catch (err) {
+      showToast(err.message || 'Failed to update item status', 'danger');
+    } finally {
+      setUpdatingItemId(null);
     }
   };
 
@@ -176,7 +192,29 @@ export default function OrdersView({ onNavigateToBilling }) {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {['PLACED', 'CONFIRMED', 'SENT_TO_KITCHEN', 'PREPARING', 'READY', 'SERVED', 'DELIVERED', 'PARTIALLY_DELIVERED'].includes(order.status) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddMoreOrder(order);
+                        }}
+                        className="btn btn-primary btn-sm"
+                        style={{
+                          background: 'linear-gradient(135deg, var(--primary) 0%, #a855f7 100%)',
+                          border: 'none',
+                          boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)',
+                          gap: '5px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          padding: '4px 10px',
+                        }}
+                      >
+                        <PlusCircle size={13} />
+                        <span>+ Add Items</span>
+                      </button>
+                    )}
+
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'Outfit' }}>
                         ₹{parseFloat(order.total_amount || 0).toFixed(2)}
@@ -212,45 +250,141 @@ export default function OrdersView({ onNavigateToBilling }) {
                 {/* Expanded Details & Actions */}
                 {isExpanded && (
                   <div style={{ padding: '18px 20px', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
-                    <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase' }}>
-                      Dishes Ordered
-                    </h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                        Dishes Ordered & Fulfillment Flow
+                      </h4>
+                      {['PLACED', 'CONFIRMED', 'SENT_TO_KITCHEN', 'PREPARING', 'READY', 'SERVED', 'DELIVERED', 'PARTIALLY_DELIVERED'].includes(order.status) && (
+                        <button
+                          onClick={() => setAddMoreOrder(order)}
+                          className="btn btn-sm btn-secondary"
+                          style={{
+                            borderColor: 'var(--primary)',
+                            color: 'var(--primary)',
+                            fontSize: '0.72rem',
+                            gap: '5px',
+                            padding: '3px 9px',
+                          }}
+                        >
+                          <PlusCircle size={13} />
+                          <span>Add More Items to this Order</span>
+                        </button>
+                      )}
+                    </div>
 
-                    {/* Items table */}
+                    {/* Items table with clear distinction between previously delivered vs newly added */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
                       {order.items?.map((it, idx) => {
                         const name = it.name || it.item_name_snapshot || it.menu_item_name || `Item ${idx + 1}`;
                         const qty = it.quantity || 1;
-                        const rate = parseFloat(it.price || it.unit_price_snapshot || it.unit_price || (it.item_total ? it.item_total / qty : 0));
+                        const rate = parseFloat(it.price_at_addition || it.price || it.unit_price_snapshot || it.unit_price || (it.item_total ? it.item_total / qty : 0));
                         const total = parseFloat(it.item_total || rate * qty);
+                        const isDelivered = it.status === 'DELIVERED' || it.status === 'SERVED';
+                        const isAdditional = it.is_additional || (it.batch_number && it.batch_number > 1);
 
                         return (
                           <div
-                            key={idx}
+                            key={it.id || idx}
                             style={{
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
-                              padding: '8px 12px',
+                              flexWrap: 'wrap',
+                              gap: '8px',
+                              padding: '10px 14px',
                               borderRadius: 'var(--radius-sm)',
-                              background: 'var(--bg-tertiary)',
+                              background: isAdditional ? 'rgba(99, 102, 241, 0.06)' : 'var(--bg-tertiary)',
+                              borderLeft: isDelivered 
+                                ? '3px solid var(--success)' 
+                                : isAdditional 
+                                ? '3px solid #a855f7' 
+                                : '3px solid var(--warning)',
                               fontSize: '0.85rem',
                             }}
                           >
-                            <div>
-                              <span style={{ fontWeight: 600 }}>{name}</span>
-                              <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
-                                &times; {qty} {rate > 0 ? `(@ ₹${rate.toFixed(2)})` : ''}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              {/* Round badge */}
+                              {isAdditional ? (
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                                  Round {it.batch_number || 2} (Additional)
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                  Round 1 (Original)
+                                </span>
+                              )}
+
+                              {/* Item status badge */}
+                              <span className={`badge ${
+                                isDelivered ? 'badge-success' :
+                                it.status === 'READY' ? 'badge-primary' :
+                                it.status === 'PREPARING' ? 'badge-warning' : 'badge-secondary'
+                              }`} style={{ fontSize: '0.65rem' }}>
+                                {it.status || (isDelivered ? 'DELIVERED' : 'PENDING')}
                               </span>
-                              {it.special_instructions && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '2px' }}>
-                                  Note: {it.special_instructions}
+
+                              <div>
+                                <span style={{ fontWeight: 600 }}>{name}</span>
+                                <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
+                                  &times; {qty} {rate > 0 ? `(@ ₹${rate.toFixed(2)})` : ''}
+                                </span>
+                                {it.added_at && isAdditional && (
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                                    (Added {new Date(it.added_at).toLocaleTimeString()})
+                                  </span>
+                                )}
+                                {it.special_instructions && (
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--warning)', marginTop: '2px' }}>
+                                    Note: {it.special_instructions}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <span style={{ fontWeight: 700, fontFamily: 'Outfit' }}>
+                                ₹{total.toFixed(2)}
+                              </span>
+
+                              {/* Quick item status advance buttons */}
+                              {it.id && (
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  {it.status === 'PENDING' && (
+                                    <button
+                                      onClick={() => handleUpdateItemStatus(order.id, it.id, 'PREPARING')}
+                                      disabled={updatingItemId === it.id}
+                                      className="btn btn-secondary btn-sm"
+                                      style={{ fontSize: '0.68rem', padding: '2px 6px' }}
+                                      title="Mark item cooking"
+                                    >
+                                      Cook
+                                    </button>
+                                  )}
+                                  {it.status === 'PREPARING' && (
+                                    <button
+                                      onClick={() => handleUpdateItemStatus(order.id, it.id, 'READY')}
+                                      disabled={updatingItemId === it.id}
+                                      className="btn btn-primary btn-sm"
+                                      style={{ fontSize: '0.68rem', padding: '2px 6px' }}
+                                      title="Mark item ready"
+                                    >
+                                      Ready
+                                    </button>
+                                  )}
+                                  {it.status === 'READY' && (
+                                    <button
+                                      onClick={() => handleUpdateItemStatus(order.id, it.id, 'DELIVERED')}
+                                      disabled={updatingItemId === it.id}
+                                      className="btn btn-success btn-sm"
+                                      style={{ fontSize: '0.68rem', padding: '2px 6px' }}
+                                      title="Mark item delivered"
+                                    >
+                                      Deliver
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
-                            <span style={{ fontWeight: 700, fontFamily: 'Outfit' }}>
-                              ₹{total.toFixed(2)}
-                            </span>
                           </div>
                         );
                       })}
@@ -258,14 +392,26 @@ export default function OrdersView({ onNavigateToBilling }) {
 
                     {/* Financial Summary breakdown */}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
-                      <div style={{ minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                      <div style={{ minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.2)', padding: '12px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                        {order.previous_item_total !== undefined && parseFloat(order.previous_item_total) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                            <span>Previous Items Total:</span>
+                            <span>₹{parseFloat(order.previous_item_total).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {order.new_item_total !== undefined && parseFloat(order.new_item_total) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', fontWeight: 600 }}>
+                            <span>Newly Added Items Total:</span>
+                            <span>+₹{parseFloat(order.new_item_total).toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontWeight: 600 }}>
                           <span>Subtotal:</span>
-                          <span>₹{parseFloat(order.subtotal || (parseFloat(order.total_amount || 0) / 1.05)).toFixed(2)}</span>
+                          <span>₹{parseFloat(order.subtotal || 0).toFixed(2)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                           <span>GST (5%):</span>
-                          <span>₹{parseFloat(order.tax_amount || (parseFloat(order.total_amount || 0) - parseFloat(order.subtotal || 0))).toFixed(2)}</span>
+                          <span>₹{parseFloat(order.tax_amount || 0).toFixed(2)}</span>
                         </div>
                         {parseFloat(order.discount_amount || 0) > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981' }}>
@@ -273,7 +419,7 @@ export default function OrdersView({ onNavigateToBilling }) {
                             <span>-₹{parseFloat(order.discount_amount || 0).toFixed(2)}</span>
                           </div>
                         )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.9rem', color: 'var(--primary)', borderTop: '1px dashed var(--border-subtle)', paddingTop: '4px', marginTop: '2px', fontFamily: 'Outfit' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.95rem', color: 'var(--primary)', borderTop: '1px dashed var(--border-subtle)', paddingTop: '6px', marginTop: '3px', fontFamily: 'Outfit' }}>
                           <span>Total Payable:</span>
                           <span>₹{parseFloat(order.total_amount || 0).toFixed(2)}</span>
                         </div>
@@ -282,6 +428,22 @@ export default function OrdersView({ onNavigateToBilling }) {
 
                     {/* Status Advance Action Buttons */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'flex-end', borderTop: '1px solid var(--border-subtle)', paddingTop: '14px' }}>
+                      {/* Add More Items button */}
+                      {['PLACED', 'CONFIRMED', 'SENT_TO_KITCHEN', 'PREPARING', 'READY', 'SERVED', 'DELIVERED', 'PARTIALLY_DELIVERED'].includes(order.status) && (
+                        <button
+                          onClick={() => setAddMoreOrder(order)}
+                          className="btn btn-primary btn-sm"
+                          style={{
+                            background: 'linear-gradient(135deg, var(--primary) 0%, #a855f7 100%)',
+                            border: 'none',
+                            gap: '6px',
+                          }}
+                        >
+                          <PlusCircle size={14} />
+                          <span>Add More Items</span>
+                        </button>
+                      )}
+
                       {order.status === 'PENDING' && (
                         <button
                           onClick={() => handleUpdateStatus(order.id, 'CONFIRMED')}
@@ -315,19 +477,19 @@ export default function OrdersView({ onNavigateToBilling }) {
                         </button>
                       )}
 
-                      {order.status === 'READY' && (
+                      {(order.status === 'READY' || order.status === 'PARTIALLY_DELIVERED') && (
                         <button
-                          onClick={() => handleUpdateStatus(order.id, 'SERVED')}
+                          onClick={() => handleUpdateStatus(order.id, 'DELIVERED')}
                           disabled={updatingId === order.id}
                           className="btn btn-primary btn-sm"
                         >
                           <Utensils size={14} />
-                          <span>Mark Served to Table</span>
+                          <span>Mark Delivered to Table</span>
                         </button>
                       )}
 
                       {/* Invoice Generation Trigger */}
-                      {['SERVED', 'READY', 'CONFIRMED'].includes(order.status) && (
+                      {['SERVED', 'DELIVERED', 'READY', 'CONFIRMED'].includes(order.status) && (
                         <button
                           onClick={() => handleGenerateInvoice(order.id)}
                           className="btn btn-secondary btn-sm"
@@ -356,6 +518,18 @@ export default function OrdersView({ onNavigateToBilling }) {
           })}
         </div>
       )}
+
+      {/* Add More Items Modal */}
+      <AddMoreItemsModal
+        order={addMoreOrder}
+        isOpen={!!addMoreOrder}
+        onClose={() => setAddMoreOrder(null)}
+        onSuccess={() => {
+          setAddMoreOrder(null);
+          loadOrders();
+        }}
+        onNavigateToBilling={onNavigateToBilling}
+      />
     </div>
   );
 }

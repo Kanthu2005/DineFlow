@@ -63,6 +63,7 @@ db = client[settings.DATABASE_NAME]
 users_collection = db["users"]
 customers_collection = db["customers"]
 menu_categories_collection = db["menu_categories"]
+menu_subcategories_collection = db["menu_subcategories"]
 menu_items_collection = db["menu_items"]
 ingredients_collection = db["ingredients"]
 recipes_collection = db["recipes"]
@@ -80,6 +81,16 @@ refunds_collection = db["refunds"]
 order_activity_logs_collection = db["order_activity_logs"]
 kitchen_events_collection = db["kitchen_events"]
 customer_feedback_collection = db["customer_feedback"]
+
+# Inventory Advanced Subsystem Collections
+ingredient_categories_collection = db["ingredient_categories"]
+batches_collection = db["ingredient_batches"]
+suppliers_collection = db["suppliers"]
+purchase_orders_collection = db["purchase_orders"]
+storage_locations_collection = db["storage_locations"]
+wastage_records_collection = db["wastage_records"]
+stock_adjustments_collection = db["stock_adjustments"]
+stock_transfers_collection = db["stock_transfers"]
 
 
 def get_database():

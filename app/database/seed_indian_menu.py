@@ -360,7 +360,7 @@ INDIAN_CATEGORIES = [
                 "price": Decimal("90.00"),
                 "preparation_time": 5,
                 "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1605197148560-efdf5eb72e2d?w=600&auto=format&fit=crop&q=80",
+                "image_url": "https://images.unsplash.com/photo-1605197586548-932f146a782b?w=600",
             },
             {
                 "name": "Kesari Rasmalai (2 pcs)",
@@ -368,7 +368,7 @@ INDIAN_CATEGORIES = [
                 "price": Decimal("120.00"),
                 "preparation_time": 5,
                 "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80",
+                "image_url": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600",
             },
             {
                 "name": "Gajar Ka Halwa",
@@ -376,7 +376,7 @@ INDIAN_CATEGORIES = [
                 "price": Decimal("130.00"),
                 "preparation_time": 6,
                 "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1605197148560-efdf5eb72e2d?w=600&auto=format&fit=crop&q=80",
+                "image_url": "https://images.unsplash.com/photo-1605197586548-932f146a782b?w=600",
             },
             {
                 "name": "Kulfi Falooda",

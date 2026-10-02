@@ -28,7 +28,7 @@ class OrderRepository(BaseRepository):
         docs = self.collection.find(
             {
                 "table_id": oid,
-                "status": {"$in": ["DRAFT", "PLACED", "CONFIRMED", "SENT_TO_KITCHEN", "PREPARING", "READY", "SERVED"]},
+                "status": {"$in": ["DRAFT", "PLACED", "CONFIRMED", "SENT_TO_KITCHEN", "PREPARING", "READY", "SERVED", "DELIVERED", "PARTIALLY_DELIVERED"]},
             }
         )
         return serialize_documents(docs)
@@ -41,13 +41,21 @@ class OrderRepository(BaseRepository):
 
     def find_order_items(self, order_id: str | ObjectId) -> List[Dict[str, Any]]:
         oid = to_object_id(order_id)
-        docs = list(self.items_col.find({"order_id": oid}))
+        docs = list(self.items_col.find({"order_id": oid}).sort("created_at", 1))
         serialized = serialize_documents(docs)
         for item in serialized:
             if "name" not in item and "item_name_snapshot" in item:
                 item["name"] = item["item_name_snapshot"]
             if "price" not in item and "unit_price_snapshot" in item:
                 item["price"] = item["unit_price_snapshot"]
+            if "price_at_addition" not in item:
+                item["price_at_addition"] = item.get("unit_price_snapshot", item.get("price"))
+            if "status" not in item:
+                item["status"] = "PENDING"
+            if "batch_number" not in item:
+                item["batch_number"] = 1
+            if "is_additional" not in item:
+                item["is_additional"] = False
         return serialized
 
     def find_order_item(self, item_id: str | ObjectId) -> Optional[Dict[str, Any]]:

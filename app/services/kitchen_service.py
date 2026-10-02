@@ -113,9 +113,9 @@ class KitchenService:
                     t["order_type"] = order.get("order_type")
                     t["table_id"] = str(order.get("table_id")) if order.get("table_id") else None
                     t["table_number"] = order.get("table_number")
-                    items = list(order_items_collection.find({"order_id": order["_id"]}))
-                    t["items"] = serialize_documents(items)
-                    t["order_items"] = t["items"]
+                    items = order_repo.find_order_items(order["_id"])
+                    t["items"] = items
+                    t["order_items"] = items
             enriched.append(t)
         return enriched
 

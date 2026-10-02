@@ -12,6 +12,8 @@ from app.schemas.order_schema import (
     OrderItemUpdate,
     OrderStatusUpdate,
     OrderDiscountUpdate,
+    AdditionalItemsRequest,
+    OrderItemStatusUpdate,
 )
 from app.services.order_service import OrderService, OrderItemService
 from app.routes.dependencies import handle_error, get_current_user, require_roles
@@ -152,6 +154,56 @@ def add_order_item(
 ):
     try:
         return OrderItemService.add_item(order_id, data)
+    except Exception as e:
+        handle_error(e)
+
+
+@router.post("/orders/{order_id}/additional-items", status_code=status.HTTP_200_OK)
+def add_additional_items_to_order(
+    order_id: str,
+    data: AdditionalItemsRequest,
+    current_user: dict = Depends(require_roles("ADMIN", "MANAGER", "WAITER", "CASHIER")),
+):
+    """
+    Adds new menu items to an existing order (including already DELIVERED orders).
+    - Preserves existing delivered items unchanged.
+    - Appends newly added items to the same order ID.
+    - Sets new items to PENDING with round/batch tracking.
+    - Recalculates order subtotal (previous + additional), taxes, and total amount.
+    - Automatically forwards new items to the kitchen workflow.
+    - Updates billing and audits addition.
+    """
+    try:
+        return OrderService.add_additional_items(
+            order_id=order_id,
+            items_data=data.items,
+            performed_by=current_user.get("name") or current_user.get("email") or "Staff",
+            role=current_user.get("role", "WAITER"),
+        )
+    except Exception as e:
+        handle_error(e)
+
+
+@router.patch("/orders/{order_id}/items/{item_id}/status")
+def update_order_item_status(
+    order_id: str,
+    item_id: str,
+    data: OrderItemStatusUpdate,
+    current_user: dict = Depends(require_roles("ADMIN", "MANAGER", "WAITER", "CASHIER", "CHEF")),
+):
+    """
+    Updates the status of an individual item in an order (e.g. PENDING -> PREPARING -> READY -> DELIVERED).
+    If DELIVERED, triggers inventory deduction for that item.
+    Updates the overall order status accordingly.
+    """
+    try:
+        return OrderService.update_item_status(
+            order_id=order_id,
+            item_id=item_id,
+            new_status=data.status,
+            performed_by=current_user.get("name", "SYSTEM"),
+            role=current_user.get("role", "SYSTEM"),
+        )
     except Exception as e:
         handle_error(e)
 

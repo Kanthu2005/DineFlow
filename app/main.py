@@ -69,6 +69,20 @@ async def lifespan(app: FastAPI):
         except Exception as ie:
             print(f"Inventory seed warning: {ie}")
 
+        try:
+            from app.database.seed_menu_items_30 import seed_30_menu_items
+            seed_30_menu_items()
+            print("Core 30-item restaurant menu verified")
+        except Exception as me:
+            print(f"Core menu seed warning: {me}")
+
+        try:
+            from app.database.seed_menu_hierarchy import seed_menu_hierarchy
+            seed_menu_hierarchy()
+            print("Hierarchical restaurant menu catalog verified")
+        except Exception as he:
+            print(f"Menu hierarchy seed warning: {he}")
+
     except Exception as e:
         print("========================================")
         print("MongoDB connection failed")
@@ -190,6 +204,14 @@ STATIC_DIR = FRONTEND_DIST if os.path.exists(FRONTEND_DIST) else FRONTEND_DIR
 
 if os.path.exists(STATIC_DIR):
     app.mount("/app", StaticFiles(directory=STATIC_DIR, html=True), name="frontend_app")
+
+# Mount static images directory at /images for direct asset access
+PUBLIC_IMAGES = os.path.join(FRONTEND_DIR, "public", "images")
+DIST_IMAGES = os.path.join(FRONTEND_DIST, "images")
+IMAGES_DIR = DIST_IMAGES if os.path.exists(DIST_IMAGES) else PUBLIC_IMAGES
+
+if os.path.exists(IMAGES_DIR):
+    app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="static_images")
 
 
 @app.get("/", include_in_schema=False)

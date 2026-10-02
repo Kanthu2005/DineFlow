@@ -34,6 +34,14 @@ def create_indexes(db):
         unique=True
     )
 
+#menusubcategories...
+    db["menu_subcategories"].create_index(
+        [("category_id", ASCENDING), ("name", ASCENDING)],
+        unique=True
+    )
+    db["menu_subcategories"].create_index(
+        [("category_id", ASCENDING)]
+    )
 
 #menuitems...
 
@@ -43,6 +51,10 @@ def create_indexes(db):
 
     db["menu_items"].create_index(
         [("category_id", ASCENDING)]
+    )
+
+    db["menu_items"].create_index(
+        [("subcategory_id", ASCENDING)]
     )
 
     db["menu_items"].create_index(

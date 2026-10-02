@@ -26,4 +26,6 @@ class Order(OrderBase):
     tax_amount: Decimal
     discount_amount: Decimal
     total_amount: Decimal
+    previous_item_total: Optional[Decimal] = None
+    new_item_total: Optional[Decimal] = None
     created_at: datetime

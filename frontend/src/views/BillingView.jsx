@@ -6,8 +6,10 @@ import {
   Receipt, CreditCard, DollarSign, CheckCircle2, RefreshCw, 
   Search, Printer, QrCode, X, ArrowDownLeft, ShieldCheck,
   AlertCircle, Split, Smartphone, Wallet, Banknote, Sparkles,
-  ShoppingBag, Check, Volume2, User, Clock, ArrowRight, Share2
+  ShoppingBag, Check, Volume2, User, Clock, ArrowRight, Share2,
+  PlusCircle
 } from 'lucide-react';
+import AddMoreItemsModal from '../components/AddMoreItemsModal';
 
 export default function BillingView({ targetInvoice, onNavigate }) {
   const { role, permissions } = useAuth();
@@ -23,6 +25,7 @@ export default function BillingView({ targetInvoice, onNavigate }) {
   const [invoices, setInvoices] = useState([]);
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [addMoreOrder, setAddMoreOrder] = useState(null);
 
   // Active billing selection
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -457,9 +460,26 @@ export default function BillingView({ targetInvoice, onNavigate }) {
                     </div>
                   </div>
 
-                  <span className="badge badge-warning" style={{ fontSize: '0.8rem', padding: '4px 12px' }}>
-                    UNPAID PRE-BILL
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      onClick={() => setAddMoreOrder(selectedOrder)}
+                      className="btn btn-primary btn-sm"
+                      style={{
+                        background: 'linear-gradient(135deg, var(--primary) 0%, #a855f7 100%)',
+                        border: 'none',
+                        gap: '5px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                      }}
+                    >
+                      <PlusCircle size={13} />
+                      <span>+ Add Items</span>
+                    </button>
+                    <span className="badge badge-warning" style={{ fontSize: '0.8rem', padding: '4px 12px' }}>
+                      UNPAID PRE-BILL
+                    </span>
+                  </div>
                 </div>
 
                 {/* Ordered Items Breakdown */}
@@ -477,11 +497,28 @@ export default function BillingView({ targetInvoice, onNavigate }) {
                     {selectedOrder.items?.map((it, idx) => {
                       const name = it.name || it.item_name_snapshot || it.menu_item_name || 'Dish Item';
                       const qty = it.quantity || 1;
-                      const rate = parseFloat(it.price || it.unit_price_snapshot || (it.item_total ? it.item_total / qty : 0));
+                      const rate = parseFloat(it.price_at_addition || it.price || it.unit_price_snapshot || (it.item_total ? it.item_total / qty : 0));
                       const total = parseFloat(it.item_total || rate * qty);
+                      const isDelivered = it.status === 'DELIVERED' || it.status === 'SERVED';
+                      const isAdditional = it.is_additional || (it.batch_number && it.batch_number > 1);
+
                       return (
                         <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 80px 90px', fontSize: '0.85rem', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                            {isAdditional ? (
+                              <span style={{ fontSize: '0.62rem', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '1px 5px', borderRadius: '3px', fontWeight: 700, flexShrink: 0 }}>
+                                R{it.batch_number || 2}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.62rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', padding: '1px 5px', borderRadius: '3px', flexShrink: 0 }}>
+                                R1
+                              </span>
+                            )}
+                            {isDelivered && (
+                              <span style={{ fontSize: '0.6rem', color: 'var(--success)', fontWeight: 700 }}>✓</span>
+                            )}
+                          </div>
                           <span style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{qty}</span>
                           <span style={{ textAlign: 'right', color: 'var(--text-muted)' }}>₹{rate.toFixed(2)}</span>
                           <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>₹{total.toFixed(2)}</span>
@@ -492,6 +529,18 @@ export default function BillingView({ targetInvoice, onNavigate }) {
 
                   {/* Calculations */}
                   <div style={{ marginTop: '12px', borderTop: '1px dashed var(--border-subtle)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem' }}>
+                    {selectedOrder.previous_item_total !== undefined && parseFloat(selectedOrder.previous_item_total) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                        <span>Previous Items Subtotal:</span>
+                        <span>₹{parseFloat(selectedOrder.previous_item_total).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {selectedOrder.new_item_total !== undefined && parseFloat(selectedOrder.new_item_total) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', fontWeight: 600 }}>
+                        <span>Newly Added Items Subtotal:</span>
+                        <span>+₹{parseFloat(selectedOrder.new_item_total).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                       <span>Subtotal:</span>
                       <span>₹{orderSubtotal.toFixed(2)}</span>
@@ -1092,6 +1141,13 @@ export default function BillingView({ targetInvoice, onNavigate }) {
                 })}
               </div>
 
+              {generatedInvoice.previous_item_total !== undefined && parseFloat(generatedInvoice.previous_item_total) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
+                  <span>Prev. Items: ₹{parseFloat(generatedInvoice.previous_item_total).toFixed(2)}</span>
+                  <span>Addl. Items: +₹{parseFloat(generatedInvoice.new_item_total || 0).toFixed(2)}</span>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', borderTop: '1px solid #000', paddingTop: '6px' }}>
                 <span>TOTAL PAID:</span>
                 <span>₹{parseFloat(generatedInvoice.total_amount || 0).toFixed(2)}</span>
@@ -1124,6 +1180,19 @@ export default function BillingView({ targetInvoice, onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* Add More Items Modal */}
+      <AddMoreItemsModal
+        order={addMoreOrder}
+        isOpen={!!addMoreOrder}
+        onClose={() => setAddMoreOrder(null)}
+        onSuccess={(updated) => {
+          setAddMoreOrder(null);
+          handleSelectOrder(updated);
+          loadData();
+        }}
+        onNavigateToBilling={null}
+      />
     </div>
   );
 }

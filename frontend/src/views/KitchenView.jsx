@@ -124,15 +124,20 @@ export default function KitchenView() {
                 }}
               >
                 {/* Ticket Header */}
-                <div style={{ padding: '14px 18px', background: 'rgba(0, 0, 0, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ padding: '14px 18px', background: 'rgba(0, 0, 0, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 800, fontSize: '1.1rem', fontFamily: 'Outfit' }}>
                         Ticket #{ticket.id?.slice(-6).toUpperCase()}
                       </span>
                       <span className={`badge ${isUrgent ? 'badge-danger' : 'badge-primary'}`}>
                         {ticket.priority || 'NORMAL'}
                       </span>
+                      {(ticket.has_additional_items || ticket.batch_number > 1 || ticket.items?.some(i => i.is_additional || i.batch_number > 1)) && (
+                        <span style={{ fontSize: '0.68rem', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
+                          ⚡ ADDL. ROUND {ticket.batch_number || 2}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span>Order #{ticket.order_number || ticket.order_id?.slice(-6) || 'Direct'}</span>
@@ -152,32 +157,59 @@ export default function KitchenView() {
                 {/* Items List */}
                 <div style={{ padding: '16px 18px', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {ticket.items && ticket.items.length > 0 ? (
-                    ticket.items.map((it, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 12px',
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--bg-tertiary)',
-                          fontSize: '0.85rem',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--primary-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem' }}>
-                            {it.quantity}
-                          </span>
-                          <span style={{ fontWeight: 600 }}>{it.menu_item_name || it.name || `Dish #${idx + 1}`}</span>
+                    ticket.items.map((it, idx) => {
+                      const isDelivered = it.status === 'DELIVERED' || it.status === 'SERVED';
+                      const isAdditional = it.is_additional || (it.batch_number && it.batch_number > 1);
+
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: isDelivered 
+                              ? 'rgba(16, 185, 129, 0.05)' 
+                              : isAdditional 
+                              ? 'rgba(168, 85, 247, 0.08)' 
+                              : 'var(--bg-tertiary)',
+                            borderLeft: isDelivered 
+                              ? '3px solid var(--success)' 
+                              : isAdditional 
+                              ? '3px solid #a855f7' 
+                              : '3px solid var(--border-subtle)',
+                            opacity: isDelivered ? 0.7 : 1,
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <span style={{ width: '22px', height: '22px', borderRadius: '4px', background: isDelivered ? 'var(--success)' : 'var(--primary-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem' }}>
+                              {it.quantity}
+                            </span>
+                            <span style={{ fontWeight: 600, textDecoration: isDelivered ? 'line-through' : 'none' }}>
+                              {it.menu_item_name || it.name || `Dish #${idx + 1}`}
+                            </span>
+                            {isAdditional && (
+                              <span style={{ fontSize: '0.62rem', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                                R{it.batch_number || 2}
+                              </span>
+                            )}
+                            {isDelivered && (
+                              <span style={{ fontSize: '0.65rem', color: 'var(--success)', fontWeight: 700 }}>
+                                Delivered ✓
+                              </span>
+                            )}
+                          </div>
+                          {it.special_instructions && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--warning)', fontStyle: 'italic' }}>
+                              {it.special_instructions}
+                            </span>
+                          )}
                         </div>
-                        {it.special_instructions && (
-                          <span style={{ fontSize: '0.7rem', color: 'var(--warning)', fontStyle: 'italic' }}>
-                            {it.special_instructions}
-                          </span>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       Items mapped from order queue.

@@ -23,6 +23,7 @@ from app.routes.activity_log_routes import router as activity_log_router
 from app.routes.kitchen_event_routes import router as kitchen_event_router
 from app.routes.feedback_routes import router as feedback_router
 from app.routes.report_routes import router as report_router
+from app.routes.purchase_routes import router as purchase_router
 
 router = APIRouter()
 
@@ -42,6 +43,7 @@ router.include_router(activity_log_router)
 router.include_router(kitchen_event_router)
 router.include_router(feedback_router)
 router.include_router(report_router)
+router.include_router(purchase_router)
 
 __all__ = [
     "router",
@@ -65,4 +67,5 @@ __all__ = [
     "kitchen_event_router",
     "feedback_router",
     "report_router",
+    "purchase_router",
 ]

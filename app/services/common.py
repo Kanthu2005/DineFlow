@@ -16,6 +16,16 @@ def to_object_id(value):
     return ObjectId(str(value))
 
 
+def optional_object_id(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, ObjectId):
+        return value
+    if not ObjectId.is_valid(str(value)):
+        return None
+    return ObjectId(str(value))
+
+
 def decimal128(value):
     if isinstance(value, Decimal128):
         return value

@@ -173,21 +173,32 @@ export const api = {
   // Menu
   menu: {
     getCategories: () => request("/menu/categories"),
+    getCategory: (id) => request(`/categories/${id}`),
     createCategory: (data) => request("/menu/categories", { method: "POST", body: data }),
+    updateCategory: (id, data) => request(`/categories/${id}`, { method: "PUT", body: data }),
     deleteCategory: (id) => request(`/menu/categories/${id}`, { method: "DELETE" }),
+    getSubcategories: (categoryId = null) => 
+      request(categoryId ? `/subcategories?category_id=${categoryId}` : "/subcategories"),
+    getSubcategory: (id) => request(`/subcategories/${id}`),
+    createSubcategory: (data) => request("/subcategories", { method: "POST", body: data }),
+    updateSubcategory: (id, data) => request(`/subcategories/${id}`, { method: "PUT", body: data }),
+    deleteSubcategory: (id) => request(`/subcategories/${id}`, { method: "DELETE" }),
     getItems: () => request("/menu/items"),
     getItem: (id) => request(`/menu/items/${id}`),
     createItem: (data) => request("/menu/items", { method: "POST", body: data }),
     updateItem: (id, data) => request(`/menu/items/${id}`, { method: "PUT", body: data }),
     deleteItem: (id) => request(`/menu/items/${id}`, { method: "DELETE" }),
+    getStats: () => request("/menu/stats"),
     getAvailability: () => request("/menu-items/availability"),
     getItemAvailability: (id, quantity = 1) => request(`/menu-items/${id}/availability?quantity=${quantity}`),
   },
 
   // Recipes
   recipes: {
-    getByMenuItem: (menuItemId) => request(`/menu-items/${menuItemId}/recipe`),
+    getByMenuItem: (menuItemId) => request(`/menu/${menuItemId}/recipe`),
     addIngredient: (menuItemId, data) => request(`/menu/${menuItemId}/recipe`, { method: "POST", body: data }),
+    updateRecipe: (menuItemId, data) => request(`/menu/${menuItemId}/recipe`, { method: "PUT", body: data }),
+    deleteRecipe: (menuItemId) => request(`/menu/${menuItemId}/recipe`, { method: "DELETE" }),
     create: (data) => request("/recipes", { method: "POST", body: data }),
     update: (id, data) => request(`/recipes/${id}`, { method: "PUT", body: data }),
     delete: (id) => request(`/recipes/${id}`, { method: "DELETE" }),
@@ -220,6 +231,8 @@ export const api = {
     updateStatus: (id, status) => request(`/orders/${id}/status`, { method: "PATCH", body: { status } }),
     updateDiscount: (id, data) => request(`/orders/${id}/discount`, { method: "PATCH", body: typeof data === "number" ? { discount_amount: data } : data }),
     addItem: (orderId, itemData) => request(`/orders/${orderId}/items`, { method: "POST", body: itemData }),
+    addAdditionalItems: (orderId, items) => request(`/orders/${orderId}/additional-items`, { method: "POST", body: { items } }),
+    updateItemStatus: (orderId, itemId, status) => request(`/orders/${orderId}/items/${itemId}/status`, { method: "PATCH", body: { status } }),
     getItems: (orderId) => request(`/orders/${orderId}/items`),
     recalculate: (orderId) => request(`/orders/${orderId}/recalculate`, { method: "POST" }),
   },

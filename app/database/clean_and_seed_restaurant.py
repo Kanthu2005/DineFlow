@@ -60,184 +60,8 @@ RAW_MATERIALS = [
     {"name": "Tomato", "unit": "KG", "current_stock": Decimal("25.00"), "low_stock_threshold": Decimal("5.00"), "cost_per_unit": Decimal("25.00")},
 ]
 
-# 3. Categories and Dishes with Recipes
-MENU_DATA = [
-    {
-        "category": "Non-Veg",
-        "description": "Authentic chicken and mutton biryanis using tracked warehouse ingredients",
-        "items": [
-            {
-                "name": "Chicken Biryani",
-                "price": Decimal("220.00"),
-                "preparation_time": 20,
-                "is_vegetarian": False,
-                "image_url": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80",
-                "description": "Dum cooked basmati rice with marinated chicken pieces and fragrant Indian spices.",
-                "recipe": [
-                    {"ingredient": "Rice", "qty": Decimal("250"), "unit": "GRAM"},
-                    {"ingredient": "Chicken", "qty": Decimal("150"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("20"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("50"), "unit": "GRAM"},
-                ]
-            },
-            {
-                "name": "Mutton Biryani",
-                "price": Decimal("340.00"),
-                "preparation_time": 25,
-                "is_vegetarian": False,
-                "image_url": "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&auto=format&fit=crop&q=80",
-                "description": "Slow-cooked tender mutton layered with saffron basmati rice and royal aroma.",
-                "recipe": [
-                    {"ingredient": "Rice", "qty": Decimal("250"), "unit": "GRAM"},
-                    {"ingredient": "Mutton", "qty": Decimal("180"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("25"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("60"), "unit": "GRAM"},
-                ]
-            },
-            {
-                "name": "Butter Chicken",
-                "price": Decimal("260.00"),
-                "preparation_time": 20,
-                "is_vegetarian": False,
-                "image_url": "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=600&auto=format&fit=crop&q=80",
-                "description": "Tender chicken cooked in a rich, buttery tomato gravy with aromatic spices.",
-                "recipe": [
-                    {"ingredient": "Chicken", "qty": Decimal("180"), "unit": "GRAM"},
-                    {"ingredient": "Tomato", "qty": Decimal("100"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("25"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("50"), "unit": "GRAM"},
-                ]
-            },
-            {
-                "name": "Kashmiri Mutton Rogan Josh",
-                "price": Decimal("360.00"),
-                "preparation_time": 25,
-                "is_vegetarian": False,
-                "image_url": "https://images.unsplash.com/photo-1545247181-516773cae754?w=600&auto=format&fit=crop&q=80",
-                "description": "Slow cooked succulent mutton in traditional Kashmiri spices and rich gravy.",
-                "recipe": [
-                    {"ingredient": "Mutton", "qty": Decimal("180"), "unit": "GRAM"},
-                    {"ingredient": "Tomato", "qty": Decimal("80"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("25"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("60"), "unit": "GRAM"},
-                ]
-            }
-        ]
-    },
-    {
-        "category": "Veg",
-        "description": "Flavorful vegetarian and paneer specialties using tracked main warehouse stock",
-        "items": [
-            {
-                "name": "Veg Biryani",
-                "price": Decimal("180.00"),
-                "preparation_time": 15,
-                "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1645177628172-a94c1f96e6db?w=600&auto=format&fit=crop&q=80",
-                "description": "Fragrant basmati rice layered with garden fresh vegetables, mint, and fried onions.",
-                "recipe": [
-                    {"ingredient": "Rice", "qty": Decimal("250"), "unit": "GRAM"},
-                    {"ingredient": "Vegetables", "qty": Decimal("100"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("20"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("50"), "unit": "GRAM"},
-                ]
-            },
-            {
-                "name": "Paneer Biryani",
-                "price": Decimal("210.00"),
-                "preparation_time": 18,
-                "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&auto=format&fit=crop&q=80",
-                "description": "Golden marinated paneer cubes layered with saffron basmati rice and caramelized onions.",
-                "recipe": [
-                    {"ingredient": "Rice", "qty": Decimal("250"), "unit": "GRAM"},
-                    {"ingredient": "Paneer", "qty": Decimal("120"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("20"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("50"), "unit": "GRAM"},
-                ]
-            },
-            {
-                "name": "Paneer Butter Masala",
-                "price": Decimal("220.00"),
-                "preparation_time": 15,
-                "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=600&auto=format&fit=crop&q=80",
-                "description": "Soft cottage cheese in a silky, creamy tomato and butter gravy.",
-                "recipe": [
-                    {"ingredient": "Paneer", "qty": Decimal("150"), "unit": "GRAM"},
-                    {"ingredient": "Tomato", "qty": Decimal("100"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("25"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("50"), "unit": "GRAM"},
-                ]
-            },
-            {
-                "name": "Dal Makhani",
-                "price": Decimal("180.00"),
-                "preparation_time": 15,
-                "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&auto=format&fit=crop&q=80",
-                "description": "Slow cooked black lentils simmered overnight with butter and fresh cream.",
-                "recipe": [
-                    {"ingredient": "Vegetables", "qty": Decimal("100"), "unit": "GRAM"},
-                    {"ingredient": "Tomato", "qty": Decimal("60"), "unit": "GRAM"},
-                    {"ingredient": "Oil", "qty": Decimal("20"), "unit": "ML"},
-                    {"ingredient": "Onion", "qty": Decimal("40"), "unit": "GRAM"},
-                ]
-            }
-        ]
-    },
-    {
-        "category": "Starters",
-        "description": "Crispy appetizers and tandoori bites that do not consume main raw materials by default",
-        "items": [
-            {
-                "name": "Chicken Starter",
-                "price": Decimal("190.00"),
-                "preparation_time": 12,
-                "is_vegetarian": False,
-                "image_url": "https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=600&auto=format&fit=crop&q=80",
-                "description": "Crispy fried spiced chicken chunks tossed with curry leaves and green chillies. (No main stock deduction)",
-                "recipe": []  # 0 inventory deduction
-            },
-            {
-                "name": "Chicken 65 Starter",
-                "price": Decimal("200.00"),
-                "preparation_time": 12,
-                "is_vegetarian": False,
-                "image_url": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80",
-                "description": "Spicy, deep-fried chicken marinated in South Indian spices. (No main stock deduction)",
-                "recipe": []  # 0 inventory deduction
-            },
-            {
-                "name": "Paneer Tikka Starter",
-                "price": Decimal("180.00"),
-                "preparation_time": 12,
-                "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=600&auto=format&fit=crop&q=80",
-                "description": "Char-grilled cottage cheese skewers with bell peppers and tandoori glaze. (No main stock deduction)",
-                "recipe": []  # 0 inventory deduction
-            },
-            {
-                "name": "Veg Crispy Starter",
-                "price": Decimal("150.00"),
-                "preparation_time": 10,
-                "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop&q=80",
-                "description": "Crunchy seasonal vegetables tossed in sweet and tangy oriental sauce. (No main stock deduction)",
-                "recipe": []  # 0 inventory deduction
-            },
-            {
-                "name": "Crispy Corn Starter",
-                "price": Decimal("160.00"),
-                "preparation_time": 10,
-                "is_vegetarian": True,
-                "image_url": "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop&q=80",
-                "description": "Golden fried American sweet corn kernels tossed with spices and spring onion. (No main stock deduction)",
-                "recipe": []  # 0 inventory deduction
-            }
-        ]
-    }
-]
+from app.database.seed_sample_menu import CATEGORIES_DATA, DISHES_DATA
+
 
 
 def clean_and_seed():
@@ -307,8 +131,9 @@ def clean_and_seed():
 
     # 4. Configure Categories & Dishes with BOM Recipes
     print("\n[4/5] Setting up Menu Categories & Recipe Mapping...")
-    for cat_data in MENU_DATA:
-        cat_name = cat_data["category"]
+    cat_map = {}
+    for cat_data in CATEGORIES_DATA:
+        cat_name = cat_data["name"]
         existing_cat = menu_categories_collection.find_one({"name": cat_name})
         if existing_cat:
             cat_id = existing_cat["_id"]
@@ -322,48 +147,51 @@ def clean_and_seed():
             })
             cat_id = res.inserted_id
             print(f"  [+] Created Category: {cat_name}")
+        cat_map[cat_name] = cat_id
 
-        for dish in cat_data["items"]:
-            dish_name = dish["name"]
-            existing_dish = menu_items_collection.find_one({"name": dish_name})
-            dish_doc = {
-                "name": dish_name,
-                "category_id": cat_id,
-                "category_name": cat_name,
-                "price": decimal128(dish["price"]),
-                "preparation_time": dish["preparation_time"],
-                "is_vegetarian": dish["is_vegetarian"],
-                "is_available": True,
-                "image_url": dish["image_url"],
-                "description": dish["description"],
-                "created_at": now_utc(),
-            }
-            if existing_dish:
-                menu_items_collection.update_one({"_id": existing_dish["_id"]}, {"$set": dish_doc})
-                dish_id = existing_dish["_id"]
-                print(f"    [OK] Updated dish: {dish_name} (INR {dish['price']})")
-            else:
-                res = menu_items_collection.insert_one(dish_doc)
-                dish_id = res.inserted_id
-                print(f"    [+] Inserted dish: {dish_name} (INR {dish['price']})")
+    for dish in DISHES_DATA:
+        dish_name = dish["name"]
+        cat_id = cat_map.get(dish["category"])
+        dish_doc = {
+            "name": dish_name,
+            "category_id": cat_id,
+            "category_name": dish["category"],
+            "price": decimal128(dish["price"]),
+            "preparation_time": dish["preparation_time"],
+            "is_vegetarian": dish["is_vegetarian"],
+            "is_available": True,
+            "image_url": dish["image_url"],
+            "description": dish["description"],
+            "updated_at": now_utc(),
+        }
+        existing_dish = menu_items_collection.find_one({"name": dish_name})
+        if existing_dish:
+            menu_items_collection.update_one({"_id": existing_dish["_id"]}, {"$set": dish_doc})
+            dish_id = existing_dish["_id"]
+            print(f"    [OK] Updated dish: {dish_name} (INR {dish['price']})")
+        else:
+            dish_doc["created_at"] = now_utc()
+            res = menu_items_collection.insert_one(dish_doc)
+            dish_id = res.inserted_id
+            print(f"    [+] Inserted dish: {dish_name} (INR {dish['price']})")
 
-            # BOM Recipe mapping
-            recipes_collection.delete_many({"menu_item_id": dish_id})
-            recipe_items = dish.get("recipe", [])
-            if recipe_items:
-                for r in recipe_items:
-                    raw_id = ing_map.get(r["ingredient"])
-                    if raw_id:
-                        recipes_collection.insert_one({
-                            "menu_item_id": dish_id,
-                            "ingredient_id": raw_id,
-                            "quantity_required": decimal128(r["qty"]),
-                            "unit": r["unit"],
-                            "created_at": now_utc(),
-                        })
-                        print(f"      -> BOM: {r['qty']} {r['unit']} {r['ingredient']}")
-            else:
-                print(f"      -> 0 Inventory Recipe (Starter exemption)")
+        # BOM Recipe mapping
+        recipes_collection.delete_many({"menu_item_id": dish_id})
+        recipe_items = dish.get("recipe", [])
+        if recipe_items:
+            for r in recipe_items:
+                raw_id = ing_map.get(r["ingredient"])
+                if raw_id:
+                    recipes_collection.insert_one({
+                        "menu_item_id": dish_id,
+                        "ingredient_id": raw_id,
+                        "quantity_required": decimal128(r["qty"]),
+                        "unit": r["unit"],
+                        "created_at": now_utc(),
+                    })
+                    print(f"      -> BOM: {r['qty']} {r['unit']} {r['ingredient']}")
+        else:
+            print(f"      -> 0 Inventory Recipe (Starter exemption)")
 
     print("\n[5/5] Seed completed cleanly and successfully!")
     print("==================================================")
