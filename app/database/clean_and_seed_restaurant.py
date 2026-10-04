@@ -32,21 +32,8 @@ from app.database.mongodb import (
 )
 from app.services.common import now_utc, decimal128, to_object_id
 
-# 1. Clean Simple Tables: T1 through T12
-STANDARD_TABLES = [
-    {"table_number": "T1", "capacity": 2, "location": "MAIN_DINING", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T2", "capacity": 2, "location": "MAIN_DINING", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T3", "capacity": 4, "location": "MAIN_DINING", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T4", "capacity": 4, "location": "MAIN_DINING", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T5", "capacity": 4, "location": "MAIN_DINING", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T6", "capacity": 4, "location": "MAIN_DINING", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T7", "capacity": 6, "location": "FAMILY_SECTION", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T8", "capacity": 6, "location": "FAMILY_SECTION", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T9", "capacity": 8, "location": "FAMILY_SECTION", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T10", "capacity": 2, "location": "WINDOW_BAY", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T11", "capacity": 4, "location": "OUTDOOR_PATIO", "status": "AVAILABLE", "is_active": True},
-    {"table_number": "T12", "capacity": 6, "location": "OUTDOOR_PATIO", "status": "AVAILABLE", "is_active": True},
-]
+# 1. Clean Simple Tables: T1 through T20
+from app.database.seed_20_tables import TABLES_20 as STANDARD_TABLES
 
 # 2. Centralized Main Inventory Raw Materials
 RAW_MATERIALS = [
@@ -79,8 +66,8 @@ def clean_and_seed():
     reservations_collection.delete_many({})
     print("  -> Invoices, Payments, Orders, OrderItems, Tickets wiped cleanly.")
 
-    # 2. Reset Tables to Clean Names: T1, T2, T3 ... T12
-    print("\n[2/5] Resetting tables to clean format: T1, T2, T3 ... T12...")
+    # 2. Reset Tables to Clean Names: T1, T2, T3 ... T20
+    print("\n[2/5] Resetting tables to clean format: T1, T2, T3 ... T20...")
     restaurant_tables_collection.delete_many({})
     for tbl in STANDARD_TABLES:
         doc = {**tbl, "created_at": now_utc()}

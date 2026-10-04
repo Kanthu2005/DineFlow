@@ -46,7 +46,10 @@ def auth_headers(client):
 @pytest.fixture
 def sample_menu_items():
     """Ensure menu items with and without recipes exist for test."""
-    # 1. Chicken Biryani (with recipe)
+    menu_items_collection.update_many(
+        {"name": {"$in": ["Test Chicken Biryani", "Test Coke", "Test Chicken 65", "Test Ice Cream"]}},
+        {"$set": {"is_available": True, "is_active": True}}
+    )
     cb = menu_items_collection.find_one({"name": "Test Chicken Biryani"})
     if not cb:
         res = menu_items_collection.insert_one({
@@ -55,6 +58,7 @@ def sample_menu_items():
             "preparation_time": 20,
             "category_id": None,
             "is_available": True,
+            "is_active": True,
             "is_vegetarian": False,
         })
         cb = menu_items_collection.find_one({"_id": res.inserted_id})
@@ -68,6 +72,7 @@ def sample_menu_items():
             "preparation_time": 5,
             "category_id": None,
             "is_available": True,
+            "is_active": True,
             "is_vegetarian": True,
         })
         coke = menu_items_collection.find_one({"_id": res.inserted_id})
@@ -81,6 +86,7 @@ def sample_menu_items():
             "preparation_time": 15,
             "category_id": None,
             "is_available": True,
+            "is_active": True,
             "is_vegetarian": False,
         })
         c65 = menu_items_collection.find_one({"_id": res.inserted_id})
@@ -94,6 +100,7 @@ def sample_menu_items():
             "preparation_time": 5,
             "category_id": None,
             "is_available": True,
+            "is_active": True,
             "is_vegetarian": True,
         })
         icecream = menu_items_collection.find_one({"_id": res.inserted_id})

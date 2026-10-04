@@ -10,15 +10,37 @@ import {
   TrendingUp, Award, DollarSign, FolderPlus, ArrowUpDown
 } from 'lucide-react';
 
+const CATEGORY_ICONS = {
+  'Starters': '🍢',
+  'Biryani': '🍲',
+  'Main Course': '🥘',
+  'Breads': '🫓',
+  'Rice & Noodles': '🍜',
+  'Desserts': '🍨',
+  'Beverages': '🍹',
+};
+
+const getCategoryIcon = (catName) => {
+  if (!catName) return '🍽️';
+  for (const [key, icon] of Object.entries(CATEGORY_ICONS)) {
+    if (catName.toLowerCase().includes(key.toLowerCase())) return icon;
+  }
+  return '🍽️';
+};
+
 const PRESET_DISH_IMAGES = [
-  { label: 'Biryani Special', url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600' },
-  { label: 'Butter Chicken', url: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=600' },
-  { label: 'Paneer Tikka', url: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=600' },
-  { label: 'Garlic Naan', url: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=600' },
-  { label: 'South Indian Dosa', url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600' },
-  { label: 'Gulab Jamun', url: 'https://images.unsplash.com/photo-1605197586548-932f146a782b?w=600' },
-  { label: 'Crispy Starter', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600' },
-  { label: 'Ice Cream Sundae', url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=600' },
+  { label: 'Paneer Tikka', url: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Chicken 65', url: 'https://images.unsplash.com/photo-1610057099431-d73a1c9d2f2f?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Chicken Dum Biryani', url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Mutton Biryani', url: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Paneer Butter Masala', url: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Butter Chicken', url: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Dal Makhani', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Butter Naan', url: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Veg Fried Rice', url: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Gulab Jamun', url: 'https://images.unsplash.com/photo-1605197586548-932f146a782b?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Mango Lassi', url: 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=600&auto=format&fit=crop&q=80' },
+  { label: 'Cold Coffee', url: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600&auto=format&fit=crop&q=80' },
 ];
 
 export default function MenuView({ onNavigate, initialTab = 'browse' }) {
@@ -38,7 +60,7 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
 
   // Filters & Search
   const [search, setSearch] = useState('');
-  const [selectedCat, setSelectedCat] = useState('ALL'); // 'ALL', 'VEG', 'NON_VEG', 'STARTERS', 'DESSERTS', or catId
+  const [selectedCat, setSelectedCat] = useState(''); // active category ID
   const [selectedSubcat, setSelectedSubcat] = useState('ALL'); // 'ALL' or subcatId
   const [dietFilter, setDietFilter] = useState('ALL'); // 'ALL', 'VEG', 'NON_VEG', 'EGG', 'BEVERAGE', 'IN_STOCK', 'OUT_OF_STOCK'
   const [priceFilter, setPriceFilter] = useState('ALL'); // 'ALL', 'UNDER_100', '100_250', 'ABOVE_250'
@@ -143,6 +165,9 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
       setItems(itemsList);
       const catList = Array.isArray(catRes) ? catRes : [];
       setCategories(catList);
+      if (catList.length > 0) {
+        setSelectedCat(prev => prev && catList.some(c => String(c.id) === String(prev)) ? prev : catList[0].id);
+      }
       const subcatList = Array.isArray(subcatRes) ? subcatRes : [];
       setSubcategories(subcatList);
       setStats(statsRes);
@@ -628,66 +653,37 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
 
   // Identify starter items
   const isItemStarter = (it) => {
-    const cat = categories.find(c => String(c.id) === String(it.category_id));
-    const catName = (cat?.name || '').toLowerCase();
+    const catName = (it.category_name || '').toLowerCase();
     const itSubcat = (it.subcategory_name || '').toLowerCase();
-    const itName = (it.name || '').toLowerCase();
-    return (
-      catName.includes('starter') ||
-      itSubcat.includes('starter') ||
-      itName.includes('tikka') ||
-      itName.includes('manchurian') ||
-      itName.includes('lollipop') ||
-      itName.includes('crispy')
-    );
+    return catName.includes('starter') || itSubcat.includes('starter');
   };
 
   // Identify dessert items
   const isItemDessert = (it) => {
-    const cat = categories.find(c => String(c.id) === String(it.category_id));
-    const catName = (cat?.name || '').toLowerCase();
+    const catName = (it.category_name || '').toLowerCase();
     const itSubcat = (it.subcategory_name || '').toLowerCase();
-    const itName = (it.name || '').toLowerCase();
-    return (
-      catName.includes('dessert') ||
-      itSubcat.includes('dessert') ||
-      itName.includes('jamun') ||
-      itName.includes('rasmalai') ||
-      itName.includes('ice cream') ||
-      itName.includes('brownie')
-    );
+    return catName.includes('dessert') || itSubcat.includes('dessert') || catName.includes('sweet');
   };
 
-  // Get active subcategories for selected category in main menu view
+  // Get active category object
   const currentCategoryObj = categories.find(c => {
-    if (selectedCat === 'VEG') return c.name.toUpperCase() === 'VEG';
-    if (selectedCat === 'NON_VEG') return c.name.toUpperCase() === 'NON-VEG';
-    if (selectedCat === 'STARTERS') return c.name.toUpperCase().includes('STARTER');
-    if (selectedCat === 'DESSERTS') return c.name.toUpperCase().includes('DESSERT');
-    return String(c.id) === String(selectedCat);
-  });
+    return String(c.id) === String(selectedCat) || (c.name && c.name.toLowerCase() === String(selectedCat).toLowerCase());
+  }) || categories[0] || null;
 
   const activeSubcategoryChips = subcategories.filter(s => {
-    if (!currentCategoryObj) return true;
+    if (!currentCategoryObj) return false;
     return String(s.category_id) === String(currentCategoryObj.id);
   });
 
   // Filter Items
   const filteredItems = items.filter(it => {
-    // Category Filter
+    // Category Filter: match active category strictly
     let matchesCat = true;
-    if (selectedCat === 'ALL') {
-      matchesCat = true;
-    } else if (selectedCat === 'VEG') {
-      matchesCat = !!it.is_vegetarian;
-    } else if (selectedCat === 'NON_VEG') {
-      matchesCat = !it.is_vegetarian;
-    } else if (selectedCat === 'STARTERS') {
-      matchesCat = isItemStarter(it);
-    } else if (selectedCat === 'DESSERTS') {
-      matchesCat = isItemDessert(it);
-    } else {
-      matchesCat = String(it.category_id) === String(selectedCat);
+    if (currentCategoryObj) {
+      matchesCat = 
+        String(it.category_id) === String(currentCategoryObj.id) ||
+        (it.category_name && it.category_name.toLowerCase() === currentCategoryObj.name.toLowerCase()) ||
+        String(it.category_id) === String(selectedCat);
     }
 
     // Subcategory Filter
@@ -703,6 +699,7 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
       it.name.toLowerCase().includes(searchLow) ||
       (it.description && it.description.toLowerCase().includes(searchLow)) ||
       (it.subcategory_name && it.subcategory_name.toLowerCase().includes(searchLow)) ||
+      (it.category_name && it.category_name.toLowerCase().includes(searchLow)) ||
       (Array.isArray(it.tags) && it.tags.some(t => t.toLowerCase().includes(searchLow)));
 
     // Dietary Filter
@@ -743,9 +740,30 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
     return (a.display_order || 0) - (b.display_order || 0);
   });
 
-  // Group items by Subcategory for hierarchical display (Section 5)
+  // Group items by Category (for Section-divided display when selectedCat === 'ALL')
+  const itemsByCategory = categories.map(cat => {
+    const catItems = sortedItems.filter(it => 
+      String(it.category_id) === String(cat.id) ||
+      (it.category_name && it.category_name.toLowerCase() === cat.name.toLowerCase())
+    );
+    return {
+      category: cat,
+      items: catItems,
+    };
+  }).filter(group => group.items.length > 0);
+
+  const matchedDishIds = new Set(itemsByCategory.flatMap(g => g.items.map(it => it.id)));
+  const uncategorizedDishes = sortedItems.filter(it => !matchedDishIds.has(it.id));
+  if (uncategorizedDishes.length > 0) {
+    itemsByCategory.push({
+      category: { id: 'other', name: 'Other Dishes', description: 'Fresh chef specialties' },
+      items: uncategorizedDishes,
+    });
+  }
+
+  // When a specific Category is chosen, group items by Subcategory
   const itemsBySubcategory = sortedItems.reduce((acc, it) => {
-    const subName = it.subcategory_name || 'General';
+    const subName = it.subcategory_name || 'All Dishes';
     if (!acc[subName]) acc[subName] = [];
     acc[subName].push(it);
     return acc;
@@ -761,6 +779,330 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
     starters: items.filter(isItemStarter).length,
     desserts: items.filter(isItemDessert).length,
     featured_items: items.filter(i => i.is_featured).length,
+  };
+
+  const renderDishCard = (item) => {
+    const isItemActive = item.is_active !== false;
+    const isItemAvail = item.is_available !== false;
+    const availInfo = availabilityMap[item.id];
+    const isOutOfStock = availInfo?.status === 'OUT_OF_STOCK';
+    const isLowStock = availInfo?.status === 'LOW_STOCK';
+    const maxPortions = availInfo?.max_portions;
+    const finalP = item.final_price != null ? item.final_price : item.price;
+    const hasDiscount = item.discount != null && parseFloat(item.discount) > 0;
+
+    return (
+      <div
+        key={item.id}
+        className="glass-panel"
+        style={{
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          opacity: isItemActive && isItemAvail && !isOutOfStock ? 1 : 0.75,
+          transition: 'all 0.25s ease',
+          border: isOutOfStock 
+            ? '1px dashed rgba(239, 68, 68, 0.5)' 
+            : isItemAvail 
+            ? '1px solid var(--border-subtle)' 
+            : '1px dashed rgba(239, 68, 68, 0.4)',
+        }}
+      >
+        {/* Dish Image Banner */}
+        <div style={{ height: '160px', background: '#0f172a', position: 'relative', overflow: 'hidden' }}>
+          <img
+            src={item.image_url || 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600'}
+            alt={item.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={e => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600';
+            }}
+          />
+
+          {/* Gradient shadow overlay */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 40%, rgba(15,23,42,0.95) 100%)',
+            }}
+          />
+
+          {/* Top Left: Food Type Indicator Badge */}
+          <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div
+              className={`food-symbol ${item.is_vegetarian ? 'veg' : 'nonveg'}`}
+              style={{
+                background: 'rgba(0, 0, 0, 0.75)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+                borderColor: item.is_vegetarian ? '#10b981' : '#ef4444',
+              }}
+            >
+              {item.is_vegetarian ? <span /> : <span />}
+            </div>
+            <span
+              style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-full)',
+                background: 'rgba(0, 0, 0, 0.75)',
+                backdropFilter: 'blur(8px)',
+                color: item.is_vegetarian ? '#10b981' : '#ef4444',
+                border: `1px solid ${item.is_vegetarian ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+              }}
+            >
+              {item.is_vegetarian ? 'VEG' : 'NON-VEG'}
+            </span>
+            {item.is_featured && (
+              <span
+                style={{
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  padding: '2px 6px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#fff',
+                  boxShadow: '0 2px 6px rgba(245, 158, 11, 0.4)',
+                }}
+              >
+                ★ FEATURED
+              </span>
+            )}
+          </div>
+
+          {/* Top Right: Status Badge & Toggle Button */}
+          <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+            <button
+              onClick={() => handleToggleAvailability(item)}
+              title={isItemAvail ? 'Mark as Unavailable' : 'Mark as Available'}
+              style={{
+                padding: '3px 8px',
+                borderRadius: 'var(--radius-full)',
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                background: isItemAvail ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              {isItemAvail ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
+              <span>{isItemAvail ? 'AVAILABLE' : 'UNAVAILABLE'}</span>
+            </button>
+
+            {availInfo && (
+              <span
+                style={{
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  background: isOutOfStock
+                    ? 'rgba(239, 68, 68, 0.95)'
+                    : isLowStock
+                    ? 'rgba(245, 158, 11, 0.95)'
+                    : 'rgba(16, 185, 129, 0.9)',
+                  color: '#ffffff',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                }}
+              >
+                {isOutOfStock
+                  ? '🔴 OUT OF STOCK'
+                  : isLowStock
+                  ? `🟡 LIMITED (${maxPortions} left)`
+                  : `🟢 IN STOCK (${maxPortions != null ? maxPortions + ' left' : 'READY'})`}
+              </span>
+            )}
+          </div>
+
+          {/* Bottom Over Image: Prep Time */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '8px',
+              left: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              color: '#e2e8f0',
+              background: 'rgba(0,0,0,0.6)',
+              padding: '2px 8px',
+              borderRadius: '4px',
+            }}
+          >
+            <Clock size={12} style={{ color: 'var(--accent)' }} />
+            <span>{item.preparation_time || 15} mins prep</span>
+          </div>
+        </div>
+
+        {/* Dish Details */}
+        <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, lineHeight: 1.3 }}>{item.name}</h3>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {item.category_name && (
+                  <span
+                    style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 600,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: 'var(--bg-tertiary)',
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.category_name}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
+              {item.description || 'Crafted with premium aromatic spices and authentic recipe.'}
+            </p>
+
+            {/* Spicy Level & Serving Size Badges */}
+            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+              {item.spicy_level && (
+                <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                  🌶️ {item.spicy_level}
+                </span>
+              )}
+              {item.serving_size && (
+                <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)' }}>
+                  🍽️ {item.serving_size}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Row: Price & Actions */}
+          <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>PRICE</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'Outfit', letterSpacing: '-0.02em' }}>
+                    ₹{parseFloat(finalP || 0).toFixed(2)}
+                  </div>
+                  {hasDiscount && (
+                    <span style={{ fontSize: '0.75rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
+                      ₹{parseFloat(item.base_price || item.price).toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                {/* Add to Cart button */}
+                {(() => {
+                  const inCart = cart.find(c => c.item.id === item.id);
+                  const cartQty = inCart ? inCart.quantity : 0;
+                  if (cartQty > 0) {
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: 'var(--primary-gradient)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '2px 4px',
+                          boxShadow: 'var(--shadow-glow)',
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCartQty(item.id, -1)}
+                          title="Decrease quantity"
+                          style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', minWidth: '18px', textAlign: 'center' }}>
+                          {cartQty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCartQty(item.id, 1)}
+                          title="Increase quantity"
+                          style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(item)}
+                      disabled={!isItemAvail || isOutOfStock}
+                      className="btn btn-primary btn-sm"
+                      title={!isItemAvail || isOutOfStock ? 'Dish is currently unavailable' : 'Add to cart'}
+                      style={{
+                        padding: '7px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        gap: '5px',
+                        opacity: !isItemAvail || isOutOfStock ? 0.6 : 1,
+                        cursor: !isItemAvail || isOutOfStock ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <ShoppingCart size={13} />
+                      <span>Add</span>
+                    </button>
+                  );
+                })()}
+
+                {/* Recipe Ingredients Button */}
+                <button
+                  onClick={() => openRecipeModal(item)}
+                  className="btn btn-secondary btn-sm"
+                  title="Manage Recipe Ingredients"
+                  style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
+                >
+                  <ChefHat size={13} style={{ color: '#f59e0b' }} />
+                  <span>Recipe</span>
+                </button>
+
+                {/* Edit & Delete (Admin/Manager/Chef) */}
+                {canManageMenu && (
+                  <>
+                    <button
+                      onClick={() => openEditItemModal(item)}
+                      className="btn btn-secondary btn-sm"
+                      title="Edit Item"
+                      style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                    <button
+                      onClick={() => setItemToDelete(item)}
+                      className="btn btn-danger btn-sm"
+                      title="Delete Item"
+                      style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -914,87 +1256,28 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
             1. CATEGORY
           </div>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center' }}>
-            <button
-              onClick={() => { setSelectedCat('ALL'); setSelectedSubcat('ALL'); }}
-              className={`btn btn-sm ${selectedCat === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', fontWeight: 700 }}
-            >
-              🍽️ All Menu ({items.length})
-            </button>
-            <button
-              onClick={() => { setSelectedCat('VEG'); setSelectedSubcat('ALL'); }}
-              className={`btn btn-sm ${selectedCat === 'VEG' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                borderRadius: 'var(--radius-full)',
-                whiteSpace: 'nowrap',
-                fontWeight: 700,
-                background: selectedCat === 'VEG' ? 'var(--primary-gradient)' : 'rgba(16, 185, 129, 0.15)',
-                borderColor: selectedCat === 'VEG' ? 'transparent' : 'rgba(16, 185, 129, 0.4)',
-                color: selectedCat === 'VEG' ? '#fff' : '#10b981',
-              }}
-            >
-              🥦 VEG ({items.filter(i => i.is_vegetarian).length})
-            </button>
-            <button
-              onClick={() => { setSelectedCat('NON_VEG'); setSelectedSubcat('ALL'); }}
-              className={`btn btn-sm ${selectedCat === 'NON_VEG' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                borderRadius: 'var(--radius-full)',
-                whiteSpace: 'nowrap',
-                fontWeight: 700,
-                background: selectedCat === 'NON_VEG' ? 'var(--primary-gradient)' : 'rgba(239, 68, 68, 0.15)',
-                borderColor: selectedCat === 'NON_VEG' ? 'transparent' : 'rgba(239, 68, 68, 0.4)',
-                color: selectedCat === 'NON_VEG' ? '#fff' : '#ef4444',
-              }}
-            >
-              🍗 NON-VEG ({items.filter(i => !i.is_vegetarian).length})
-            </button>
-            <button
-              onClick={() => { setSelectedCat('STARTERS'); setSelectedSubcat('ALL'); }}
-              className={`btn btn-sm ${selectedCat === 'STARTERS' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                borderRadius: 'var(--radius-full)',
-                whiteSpace: 'nowrap',
-                fontWeight: 700,
-                background: selectedCat === 'STARTERS' ? 'var(--primary-gradient)' : 'rgba(245, 158, 11, 0.15)',
-                borderColor: selectedCat === 'STARTERS' ? 'transparent' : 'rgba(245, 158, 11, 0.4)',
-                color: selectedCat === 'STARTERS' ? '#fff' : '#f59e0b',
-              }}
-            >
-              🍢 STARTERS ({items.filter(isItemStarter).length})
-            </button>
-            <button
-              onClick={() => { setSelectedCat('DESSERTS'); setSelectedSubcat('ALL'); }}
-              className={`btn btn-sm ${selectedCat === 'DESSERTS' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                borderRadius: 'var(--radius-full)',
-                whiteSpace: 'nowrap',
-                fontWeight: 700,
-                background: selectedCat === 'DESSERTS' ? 'var(--primary-gradient)' : 'rgba(236, 72, 153, 0.15)',
-                borderColor: selectedCat === 'DESSERTS' ? 'transparent' : 'rgba(236, 72, 153, 0.4)',
-                color: selectedCat === 'DESSERTS' ? '#fff' : '#ec4899',
-              }}
-            >
-              🍨 DESSERTS ({items.filter(isItemDessert).length})
-            </button>
-
-            {/* Custom Categories */}
-            {categories
-              .filter(c => !['veg', 'non-veg', 'starters', 'starter', 'desserts', 'dessert'].includes(c.name.toLowerCase().trim()))
-              .map(c => {
-                const count = items.filter(it => String(it.category_id) === String(c.id)).length;
-                const isSelected = selectedCat === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => { setSelectedCat(c.id); setSelectedSubcat('ALL'); }}
-                    className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap' }}
-                  >
-                    {c.name} ({count})
-                  </button>
-                );
-              })}
+            {categories.map(c => {
+              const count = items.filter(it => 
+                String(it.category_id) === String(c.id) ||
+                (it.category_name && it.category_name.toLowerCase() === c.name.toLowerCase())
+              ).length;
+              const isSelected = String(selectedCat) === String(c.id) || (selectedCat !== 'ALL' && String(selectedCat).toLowerCase() === c.name.toLowerCase());
+              const icon = getCategoryIcon(c.name);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => { setSelectedCat(c.id); setSelectedSubcat('ALL'); }}
+                  className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{
+                    borderRadius: 'var(--radius-full)',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 700,
+                  }}
+                >
+                  {icon} {c.name} ({count})
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -1208,9 +1491,132 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
             <span>+ Add Menu Item</span>
           </button>
         </div>
+      ) : selectedCat === 'ALL' ? (
+        /* Divided by Category when viewing ALL items */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+          {itemsByCategory.map(({ category, items: catItems }) => {
+            const catIcon = getCategoryIcon(category.name);
+            return (
+              <div key={category.id || category.name} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Category Header Banner */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '2px solid rgba(255, 255, 255, 0.08)',
+                    paddingBottom: '12px',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div
+                      style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'rgba(99, 102, 241, 0.12)',
+                        border: '1px solid rgba(99, 102, 241, 0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.6rem',
+                      }}
+                    >
+                      {catIcon}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', fontFamily: 'Outfit', color: 'var(--text-primary)', margin: 0 }}>
+                          {category.name}
+                        </h2>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: 'rgba(99, 102, 241, 0.18)',
+                            color: '#818cf8',
+                            border: '1px solid rgba(99, 102, 241, 0.3)',
+                            padding: '2px 10px',
+                            borderRadius: 'var(--radius-full)',
+                          }}
+                        >
+                          {catItems.length} {catItems.length === 1 ? 'dish' : 'dishes'}
+                        </span>
+                      </div>
+                      {category.description && (
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '700px' }}>
+                          {category.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedCat(category.id); setSelectedSubcat('ALL'); }}
+                    className="btn btn-xs btn-secondary"
+                    style={{ borderRadius: 'var(--radius-full)', padding: '6px 14px', fontSize: '0.75rem', fontWeight: 600 }}
+                  >
+                    Explore {category.name} &rarr;
+                  </button>
+                </div>
+
+                {/* Dish Cards Grid */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '20px',
+                  }}
+                >
+                  {catItems.map(renderDishCard)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        /* Hierarchical Grouping by Subcategory (Section 5) */
+        /* Divided by Subcategory when viewing a specific Category */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {/* Active Category Header */}
+          {currentCategoryObj && (
+            <div
+              className="glass-panel"
+              style={{
+                padding: '16px 20px',
+                borderRadius: 'var(--radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                borderLeft: '4px solid var(--primary)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <span style={{ fontSize: '2rem' }}>{getCategoryIcon(currentCategoryObj.name)}</span>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'Outfit', color: 'var(--text-primary)' }}>
+                      {currentCategoryObj.name}
+                    </h2>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                      {sortedItems.length} dishes in this category
+                    </span>
+                  </div>
+                  {currentCategoryObj.description && (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      {currentCategoryObj.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subcategory sections */}
           {Object.entries(itemsBySubcategory).map(([subcatTitle, subItems]) => (
             <div key={subcatTitle} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
@@ -1231,329 +1637,7 @@ export default function MenuView({ onNavigate, initialTab = 'browse' }) {
                   gap: '20px',
                 }}
               >
-                {subItems.map(item => {
-                  const isItemActive = item.is_active !== false;
-                  const isItemAvail = item.is_available !== false;
-                  const availInfo = availabilityMap[item.id];
-                  const isOutOfStock = availInfo?.status === 'OUT_OF_STOCK';
-                  const isLowStock = availInfo?.status === 'LOW_STOCK';
-                  const maxPortions = availInfo?.max_portions;
-                  const finalP = item.final_price != null ? item.final_price : item.price;
-                  const hasDiscount = item.discount != null && parseFloat(item.discount) > 0;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="glass-panel"
-                      style={{
-                        borderRadius: 'var(--radius-lg)',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        opacity: isItemActive && isItemAvail && !isOutOfStock ? 1 : 0.75,
-                        transition: 'all 0.25s ease',
-                        border: isOutOfStock 
-                          ? '1px dashed rgba(239, 68, 68, 0.5)' 
-                          : isItemAvail 
-                          ? '1px solid var(--border-subtle)' 
-                          : '1px dashed rgba(239, 68, 68, 0.4)',
-                      }}
-                    >
-                      {/* Dish Image Banner */}
-                      <div style={{ height: '160px', background: '#0f172a', position: 'relative', overflow: 'hidden' }}>
-                        <img
-                          src={item.image_url || 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600'}
-                          alt={item.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={e => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600';
-                          }}
-                        />
-
-                        {/* Gradient shadow overlay */}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 40%, rgba(15,23,42,0.95) 100%)',
-                          }}
-                        />
-
-                        {/* Top Left: Food Type Indicator Badge */}
-                        <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div
-                            className={`food-symbol ${item.is_vegetarian ? 'veg' : 'nonveg'}`}
-                            style={{
-                              background: 'rgba(0, 0, 0, 0.75)',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
-                              borderColor: item.is_vegetarian ? '#10b981' : '#ef4444',
-                            }}
-                          >
-                            {item.is_vegetarian ? <span /> : <span />}
-                          </div>
-                          <span
-                            style={{
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              padding: '2px 8px',
-                              borderRadius: 'var(--radius-full)',
-                              background: 'rgba(0, 0, 0, 0.75)',
-                              backdropFilter: 'blur(8px)',
-                              color: item.is_vegetarian ? '#10b981' : '#ef4444',
-                              border: `1px solid ${item.is_vegetarian ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
-                            }}
-                          >
-                            {item.is_vegetarian ? 'VEG' : 'NON-VEG'}
-                          </span>
-                          {item.is_featured && (
-                            <span
-                              style={{
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                padding: '2px 6px',
-                                borderRadius: 'var(--radius-full)',
-                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                color: '#fff',
-                                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.4)',
-                              }}
-                            >
-                              ★ FEATURED
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Top Right: Status Badge & Toggle Button */}
-                        <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                          <button
-                            onClick={() => handleToggleAvailability(item)}
-                            title={isItemAvail ? 'Mark as Unavailable' : 'Mark as Available'}
-                            style={{
-                              padding: '3px 8px',
-                              borderRadius: 'var(--radius-full)',
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              background: isItemAvail ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)',
-                              color: '#ffffff',
-                              border: 'none',
-                              cursor: 'pointer',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            {isItemAvail ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
-                            <span>{isItemAvail ? 'AVAILABLE' : 'UNAVAILABLE'}</span>
-                          </button>
-
-                          {availInfo && (
-                            <span
-                              style={{
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                padding: '2px 7px',
-                                borderRadius: '4px',
-                                background: isOutOfStock
-                                  ? 'rgba(239, 68, 68, 0.95)'
-                                  : isLowStock
-                                  ? 'rgba(245, 158, 11, 0.95)'
-                                  : 'rgba(16, 185, 129, 0.9)',
-                                color: '#ffffff',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                              }}
-                            >
-                              {isOutOfStock
-                                ? '🔴 OUT OF STOCK'
-                                : isLowStock
-                                ? `🟡 LIMITED (${maxPortions} left)`
-                                : `🟢 IN STOCK (${maxPortions != null ? maxPortions + ' left' : 'READY'})`}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Bottom Over Image: Prep Time */}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            bottom: '8px',
-                            left: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.72rem',
-                            color: '#e2e8f0',
-                            background: 'rgba(0,0,0,0.6)',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          <Clock size={12} style={{ color: 'var(--accent)' }} />
-                          <span>{item.preparation_time || 15} mins prep</span>
-                        </div>
-                      </div>
-
-                      {/* Dish Details */}
-                      <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, lineHeight: 1.3 }}>{item.name}</h3>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              {item.category_name && (
-                                <span
-                                  style={{
-                                    fontSize: '0.65rem',
-                                    fontWeight: 600,
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    background: 'var(--bg-tertiary)',
-                                    color: 'var(--text-muted)',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {item.category_name}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
-                            {item.description || 'Crafted with premium aromatic spices and authentic recipe.'}
-                          </p>
-
-                          {/* Spicy Level & Serving Size Badges */}
-                          <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-                            {item.spicy_level && (
-                              <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-                                🌶️ {item.spicy_level}
-                              </span>
-                            )}
-                            {item.serving_size && (
-                              <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)' }}>
-                                🍽️ {item.serving_size}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Bottom Row: Price & Actions */}
-                        <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>PRICE</span>
-                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'Outfit', letterSpacing: '-0.02em' }}>
-                                  ₹{parseFloat(finalP || 0).toFixed(2)}
-                                </div>
-                                {hasDiscount && (
-                                  <span style={{ fontSize: '0.75rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
-                                    ₹{parseFloat(item.base_price || item.price).toFixed(2)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
-                              {/* Add to Cart button */}
-                              {(() => {
-                                const inCart = cart.find(c => c.item.id === item.id);
-                                const cartQty = inCart ? inCart.quantity : 0;
-                                if (cartQty > 0) {
-                                  return (
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: 'var(--primary-gradient)',
-                                        borderRadius: 'var(--radius-md)',
-                                        padding: '2px 4px',
-                                        boxShadow: 'var(--shadow-glow)',
-                                      }}
-                                    >
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpdateCartQty(item.id, -1)}
-                                        title="Decrease quantity"
-                                        style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
-                                      >
-                                        <Minus size={13} />
-                                      </button>
-                                      <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.8rem', minWidth: '18px', textAlign: 'center' }}>
-                                        {cartQty}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleAddToCart(item)}
-                                        title="Add more"
-                                        style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center' }}
-                                      >
-                                        <Plus size={13} />
-                                      </button>
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAddToCart(item)}
-                                    disabled={!isItemAvail || isOutOfStock}
-                                    className="btn btn-primary btn-sm"
-                                    title={!isItemAvail || isOutOfStock ? 'Dish is currently unavailable' : 'Add to cart'}
-                                    style={{
-                                      padding: '7px 12px',
-                                      fontSize: '0.78rem',
-                                      fontWeight: 700,
-                                      gap: '5px',
-                                      opacity: !isItemAvail || isOutOfStock ? 0.6 : 1,
-                                      cursor: !isItemAvail || isOutOfStock ? 'not-allowed' : 'pointer',
-                                    }}
-                                  >
-                                    <ShoppingCart size={13} />
-                                    <span>Add</span>
-                                  </button>
-                                );
-                              })()}
-
-                              {/* Recipe Ingredients Button */}
-                              <button
-                                onClick={() => openRecipeModal(item)}
-                                className="btn btn-secondary btn-sm"
-                                title="Manage Recipe Ingredients"
-                                style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
-                              >
-                                <ChefHat size={13} style={{ color: '#f59e0b' }} />
-                                <span>Recipe</span>
-                              </button>
-
-                              {/* Edit & Delete (Admin/Manager/Chef) */}
-                              {canManageMenu && (
-                                <>
-                                  <button
-                                    onClick={() => openEditItemModal(item)}
-                                    className="btn btn-secondary btn-sm"
-                                    title="Edit Item"
-                                    style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
-                                  >
-                                    <Edit2 size={13} />
-                                  </button>
-                                  <button
-                                    onClick={() => setItemToDelete(item)}
-                                    className="btn btn-danger btn-sm"
-                                    title="Delete Item"
-                                    style={{ padding: '7px 9px', fontSize: '0.75rem', gap: '4px' }}
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {subItems.map(renderDishCard)}
               </div>
             </div>
           ))}

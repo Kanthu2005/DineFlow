@@ -54,34 +54,19 @@ async def lifespan(app: FastAPI):
                     })
         print("Default staff role accounts verified")
 
-        if not is_vercel or not has_menu:
-            try:
-                from app.database.seed_indian_menu import seed_indian_menu
-                seed_indian_menu()
-                print("Indian cuisine menu catalog verified")
-            except Exception as se:
-                print(f"Menu seed warning: {se}")
-
         try:
-            from app.database.seed_inventory_recipes import seed_inventory_and_recipes
-            seed_inventory_and_recipes()
-            print("Recipe-based inventory catalog verified")
-        except Exception as ie:
-            print(f"Inventory seed warning: {ie}")
-
-        try:
-            from app.database.seed_menu_items_30 import seed_30_menu_items
-            seed_30_menu_items()
-            print("Core 30-item restaurant menu verified")
+            from app.database.clean_and_fix_menu import clean_and_seed_menu
+            clean_and_seed_menu()
+            print("Canonical restaurant menu catalog verified")
         except Exception as me:
-            print(f"Core menu seed warning: {me}")
+            print(f"Canonical menu seed warning: {me}")
 
         try:
-            from app.database.seed_menu_hierarchy import seed_menu_hierarchy
-            seed_menu_hierarchy()
-            print("Hierarchical restaurant menu catalog verified")
-        except Exception as he:
-            print(f"Menu hierarchy seed warning: {he}")
+            from app.database.seed_20_tables import seed_20_tables
+            seed_20_tables()
+            print("20 Standard restaurant tables verified (T1 - T20)")
+        except Exception as te:
+            print(f"Tables seed warning: {te}")
 
     except Exception as e:
         print("========================================")

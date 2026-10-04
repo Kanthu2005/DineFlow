@@ -27,6 +27,14 @@ from app.services.recipe_service import RecipeService
 from app.services.ingredient_service import IngredientService
 
 
+from app.database.seed_inventory_recipes import seed_inventory_and_recipes
+
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_recipe_inventory():
+    seed_inventory_and_recipes()
+
+
 @pytest.fixture
 def client():
     return TestClient(app)

@@ -155,12 +155,18 @@ export default function TablesView({ onNavigateToBilling }) {
   const reservedCount = tables.filter(t => t.status === 'RESERVED').length;
   const occupancyRate = totalTables > 0 ? Math.round((occupiedCount / totalTables) * 100) : 0;
 
-  // Filtered tables
-  const filteredTables = tables.filter(t => {
-    const matchesZone = selectedZone === 'ALL' || t.location === selectedZone;
-    const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-    return matchesZone && matchesStatus;
-  });
+  // Filtered tables (sorted naturally: T1, T2 ... T20)
+  const filteredTables = tables
+    .filter(t => {
+      const matchesZone = selectedZone === 'ALL' || t.location === selectedZone;
+      const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
+      return matchesZone && matchesStatus;
+    })
+    .sort((a, b) => {
+      const numA = parseInt((a.table_number || '').replace(/\D/g, ''), 10) || 999;
+      const numB = parseInt((b.table_number || '').replace(/\D/g, ''), 10) || 999;
+      return numA - numB;
+    });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>

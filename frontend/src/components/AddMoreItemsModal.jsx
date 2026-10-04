@@ -20,7 +20,7 @@ export default function AddMoreItemsModal({ order, isOpen, onClose, onSuccess, o
 
   // Filters
   const [search, setSearch] = useState('');
-  const [selectedCat, setSelectedCat] = useState('ALL');
+  const [selectedCat, setSelectedCat] = useState('');
   const [dietFilter, setDietFilter] = useState('ALL'); // 'ALL', 'VEG', 'NON_VEG'
 
   // Additional items cart: { [menu_item_id]: { item, quantity, special_instructions } }
@@ -48,7 +48,11 @@ export default function AddMoreItemsModal({ order, isOpen, onClose, onSuccess, o
         api.menu.getCategories().catch(() => []),
       ]);
       setMenuItems(Array.isArray(itemsRes) ? itemsRes.filter(i => i.is_available !== false) : []);
-      setCategories(Array.isArray(catsRes) ? catsRes : []);
+      const cats = Array.isArray(catsRes) ? catsRes : [];
+      setCategories(cats);
+      if (cats.length > 0) {
+        setSelectedCat(prev => prev && cats.some(c => String(c.id || c._id) === String(prev)) ? prev : (cats[0].id || cats[0]._id));
+      }
     } catch (err) {
       console.error('Failed to load menu items:', err);
       showToast('Could not load menu items', 'error');
@@ -108,7 +112,8 @@ export default function AddMoreItemsModal({ order, isOpen, onClose, onSuccess, o
 
   // Filtered menu list
   const filteredMenuItems = menuItems.filter(item => {
-    const matchesCat = selectedCat === 'ALL' || item.category_id === selectedCat || item.category === selectedCat;
+    const matchesCat = !selectedCat || item.category_id === selectedCat || item.category === selectedCat ||
+      (item.category_name && categories.find(c => String(c.id || c._id) === String(selectedCat))?.name.toLowerCase() === item.category_name.toLowerCase());
     const matchesSearch = !search || item.name.toLowerCase().includes(search.toLowerCase()) || 
                           (item.description && item.description.toLowerCase().includes(search.toLowerCase()));
     const isVeg = item.is_veg === true || item.dietary_tag === 'VEG';
@@ -285,13 +290,6 @@ export default function AddMoreItemsModal({ order, isOpen, onClose, onSuccess, o
                   background: 'var(--bg-tertiary)',
                 }}
               >
-                <button
-                  onClick={() => setSelectedCat('ALL')}
-                  className={`btn btn-sm ${selectedCat === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ borderRadius: 'var(--radius-full)', fontSize: '0.72rem', padding: '3px 10px' }}
-                >
-                  All Categories
-                </button>
                 {categories.map(cat => (
                   <button
                     key={cat.id || cat._id}

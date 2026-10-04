@@ -105,6 +105,13 @@ def test_01_create_menu_item_successfully(auth_tokens):
     assert Decimal(str(data["price"])) == Decimal("280.00")
     assert data["preparation_time"] == 25
 
+    # Clean up created test item to prevent duplicate name collisions with recipe inventory tests
+    from app.database.mongodb import menu_items_collection, menu_categories_collection
+    from app.services.common import to_object_id
+    menu_items_collection.delete_one({"_id": to_object_id(data["id"])})
+    if cat_res.status_code == 201:
+        menu_categories_collection.delete_one({"_id": to_object_id(cat_id)})
+
 
 def test_02_reject_negative_price(auth_tokens):
     """2. Reject a negative price."""
@@ -809,6 +816,12 @@ def test_31_table_management_occupy_and_release(auth_tokens):
     )
     assert res2.status_code in [400, 422]
 
+    # Clean up test table and associated test orders
+    from app.database.mongodb import restaurant_tables_collection, orders_collection
+    from app.services.common import to_object_id
+    restaurant_tables_collection.delete_one({"_id": to_object_id(table_id)})
+    orders_collection.delete_one({"_id": to_object_id(order1["id"])})
+
 
 def test_32_reservation_overlap_and_capacity_check(auth_tokens):
     """32. Reservation overlap rejection & capacity check."""
@@ -863,6 +876,12 @@ def test_32_reservation_overlap_and_capacity_check(auth_tokens):
         headers=auth_tokens["waiter"],
     )
     assert r2.status_code in [400, 422]
+
+    # Clean up test table and test reservations
+    from app.database.mongodb import restaurant_tables_collection, reservations_collection
+    from app.services.common import to_object_id
+    restaurant_tables_collection.delete_one({"_id": to_object_id(tbl["id"])})
+    reservations_collection.delete_many({"table_id": tbl["id"]})
 
 
 def test_33_customer_feedback_validation_and_duplicate_prevention(auth_tokens):

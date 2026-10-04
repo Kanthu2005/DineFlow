@@ -9,11 +9,15 @@ import {
 } from 'lucide-react';
 
 const PRESET_DISH_IMAGES = [
-  { label: 'Biryani Special', url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600' },
-  { label: 'Butter Chicken', url: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=600' },
-  { label: 'Paneer Tikka', url: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=600' },
-  { label: 'Crispy Starter', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600' },
-  { label: 'Indian Curry', url: 'https://images.unsplash.com/photo-1545247181-516773cae754?w=600' },
+  { label: 'Hyderabadi Biryani', url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Butter Chicken', url: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Paneer Tikka', url: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Crispy Chicken 65', url: 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Dal Makhani', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Butter Garlic Naan', url: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Fried Rice & Noodles', url: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Gulab Jamun & Desserts', url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800&auto=format&fit=crop&q=80' },
+  { label: 'Mango Lassi & Drinks', url: 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=800&auto=format&fit=crop&q=80' },
 ];
 
 export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
@@ -25,7 +29,7 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
   const [items, setItems] = useState([]);
   const [tables, setTables] = useState([]);
   const [availabilityMap, setAvailabilityMap] = useState({});
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubcat, setSelectedSubcat] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [dietFilter, setDietFilter] = useState('ALL'); // 'ALL' | 'VEG' | 'NON_VEG'
@@ -98,8 +102,11 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
         api.menu.getItems(),
         api.tables.getAll(),
         api.menu.getAvailability().catch(() => ({})),
-      ]);
-      setCategories(Array.isArray(catsRes) ? catsRes : []);
+      const cats = Array.isArray(catsRes) ? catsRes : [];
+      setCategories(cats);
+      if (cats.length > 0) {
+        setSelectedCategory(prev => prev && cats.some(c => String(c.id) === String(prev)) ? prev : cats[0].id);
+      }
       setSubcategories(Array.isArray(subcatsRes) ? subcatsRes : []);
       setItems(Array.isArray(itemsRes) ? itemsRes : []);
       setTables(Array.isArray(tablesRes) ? tablesRes : []);
@@ -269,7 +276,9 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
   // Filter items
   const filteredItems = items.filter((item) => {
     const matchesCategory =
-      selectedCategory === 'ALL' || item.category_id === selectedCategory;
+      !selectedCategory ||
+      item.category_id === selectedCategory ||
+      (item.category_name && categories.find((c) => String(c.id) === String(selectedCategory))?.name.toLowerCase() === item.category_name.toLowerCase());
     const matchesSubcat =
       selectedSubcat === 'ALL' || 
       String(item.subcategory_id) === String(selectedSubcat) || 
@@ -450,13 +459,6 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
         {/* Categories Bar & Quick Add */}
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
-            <button
-              onClick={() => { setSelectedCategory('ALL'); setSelectedSubcat('ALL'); }}
-              className={`btn btn-sm ${selectedCategory === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ borderRadius: 'var(--radius-full)' }}
-            >
-              All Dishes ({items.length})
-            </button>
             {categories.map((cat) => (
               <button
                 key={cat.id}
@@ -860,11 +862,17 @@ export default function PosView({ onOrderPlaced, onNavigate, initialTableId }) {
                 style={{ height: '32px', fontSize: '0.8rem' }}
               >
                 <option value="">Select Table *</option>
-                {tables.map((tbl) => (
-                  <option key={tbl.id} value={tbl.id}>
-                    {tbl.table_number?.toString().toUpperCase().startsWith('T') ? tbl.table_number : `T${tbl.table_number}`} ({tbl.capacity} Seats)
-                  </option>
-                ))}
+                {[...tables]
+                  .sort((a, b) => {
+                    const numA = parseInt((a.table_number || '').replace(/\D/g, ''), 10) || 999;
+                    const numB = parseInt((b.table_number || '').replace(/\D/g, ''), 10) || 999;
+                    return numA - numB;
+                  })
+                  .map((tbl) => (
+                    <option key={tbl.id} value={tbl.id}>
+                      {tbl.table_number?.toString().toUpperCase().startsWith('T') ? tbl.table_number : `T${tbl.table_number}`} ({tbl.capacity} Seats)
+                    </option>
+                  ))}
               </select>
             ) : (
               <input

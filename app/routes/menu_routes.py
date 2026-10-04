@@ -72,7 +72,7 @@ def create_category(
     include_in_schema=False,
 )
 def get_categories(
-    active_only: bool = Query(default=False, description="Filter only active categories"),
+    active_only: bool = Query(default=True, description="Filter only active categories"),
     current_user: dict = Depends(get_current_user),
 ):
     try:
@@ -192,7 +192,7 @@ def create_subcategory(
 )
 def get_subcategories(
     category_id: Optional[str] = Query(default=None, description="Optional parent category filter"),
-    active_only: bool = Query(default=False, description="Filter only active subcategories"),
+    active_only: bool = Query(default=True, description="Filter only active subcategories"),
     current_user: dict = Depends(get_current_user),
 ):
     try:
@@ -213,7 +213,7 @@ def get_subcategories(
 )
 def get_subcategories_by_category(
     category_id: str,
-    active_only: bool = Query(default=False),
+    active_only: bool = Query(default=True),
     current_user: dict = Depends(get_current_user),
 ):
     try:

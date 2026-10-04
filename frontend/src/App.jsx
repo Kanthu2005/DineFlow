@@ -220,7 +220,6 @@ function AppContent() {
             <>
               {currentView === 'dashboard' && <DashboardView onNavigate={handleNavigate} />}
               {currentView === 'menu' && <MenuView onNavigate={handleNavigate} initialTab="browse" />}
-              {currentView === 'add-menu' && <MenuView onNavigate={handleNavigate} initialTab="add" />}
               {currentView === 'orders' && <OrdersView onNavigateToBilling={handleNavigateToBilling} />}
               {currentView === 'kitchen' && <KitchenView />}
               {currentView === 'tables' && (

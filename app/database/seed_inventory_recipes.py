@@ -37,13 +37,13 @@ RAW_MATERIALS = [
 
 CATEGORIES_DATA = [
     {
-        "name": "Non-Veg",
-        "description": "Rich non-vegetarian biryanis and authentic meat specialties",
+        "name": "Biryani",
+        "description": "Rich authentic biryanis and royal rice specialties",
         "items": [
             {
                 "name": "Chicken Biryani",
-                "price": Decimal("220.00"),
-                "preparation_time": 20,
+                "price": Decimal("250.00"),
+                "preparation_time": 25,
                 "is_vegetarian": False,
                 "image_url": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80",
                 "description": "Dum cooked basmati rice with marinated chicken pieces and fragrant Indian herbs.",
@@ -56,8 +56,8 @@ CATEGORIES_DATA = [
             },
             {
                 "name": "Mutton Biryani",
-                "price": Decimal("340.00"),
-                "preparation_time": 25,
+                "price": Decimal("320.00"),
+                "preparation_time": 30,
                 "is_vegetarian": False,
                 "image_url": "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=600&auto=format&fit=crop&q=80",
                 "description": "Slow-cooked tender mutton layered with saffron basmati rice and royal spices.",
@@ -68,16 +68,10 @@ CATEGORIES_DATA = [
                     {"ingredient": "Onion", "qty": Decimal("60"), "unit": "G"},
                 ]
             },
-        ]
-    },
-    {
-        "name": "Veg",
-        "description": "Flavorful vegetarian biryanis and garden-fresh cottage cheese mains",
-        "items": [
             {
                 "name": "Veg Biryani",
                 "price": Decimal("180.00"),
-                "preparation_time": 15,
+                "preparation_time": 20,
                 "is_vegetarian": True,
                 "image_url": "https://images.unsplash.com/photo-1645177628172-a94c1f96e6db?w=600&auto=format&fit=crop&q=80",
                 "description": "Fragrant basmati rice layered with garden fresh vegetables, mint, and fried onions.",

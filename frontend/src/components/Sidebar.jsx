@@ -9,7 +9,6 @@ import { useAuth, ROLE_PERMISSIONS } from '../context/AuthContext';
 export const ALL_NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
-  { id: 'add-menu', label: 'Add Menu', icon: PlusCircle },
   { id: 'orders', label: 'Live Orders', icon: Clock },
   { id: 'kitchen', label: 'Kitchen (KDS)', icon: ChefHat },
   { id: 'tables', label: 'Tables & Floor', icon: Grid },
